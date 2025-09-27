@@ -136,7 +136,7 @@ export default function LoginForm({ onStepChange }) {
           </button>
 
           <div className="text-center">
-            <span className="text-foreground-muted text-sm">New to Alumni Connect? </span>
+            <span className="text-foreground-muted text-sm">New to AlumniVerse? </span>
             <button
               onClick={() => onStepChange("signup")}
               className="text-primary hover:text-primary-hover text-sm font-medium"

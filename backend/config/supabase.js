@@ -76,6 +76,44 @@ const supabaseHelpers = {
       return data;
     },
 
+    // Admin create - bypasses RLS for server-side operations
+    adminCreate: async (userData) => {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .insert([userData])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+
+    // Admin update - bypasses RLS for server-side operations
+    adminUpdate: async (id, updateData) => {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .update(updateData)
+        .eq('id', id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+
+    // Admin find by auth ID - bypasses RLS
+    adminFindByAuthId: async (authId) => {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('auth_id', authId)
+        .eq('is_deleted', false)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+
     update: async (id, updateData) => {
       const { data, error } = await supabase
         .from('users')

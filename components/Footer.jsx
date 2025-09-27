@@ -7,7 +7,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <h3 className="text-2xl font-bold gradient-text">Alumni Connect</h3>
+            <h3 className="text-2xl font-bold gradient-text">AlumniVerse</h3>
             <p className="text-foreground-muted text-sm leading-relaxed">
               Connecting alumni, fostering growth, and building lasting professional relationships.
             </p>
@@ -118,7 +118,7 @@ export default function Footer() {
 
         <div className="mt-12 pt-8 border-t border-border-subtle">
           <div className="flex flex-col sm:flex-row justify-between items-center">
-            <p className="text-foreground-muted text-sm">© {currentYear} Alumni Connect. All rights reserved.</p>
+            <p className="text-foreground-muted text-sm">© {currentYear} AlumniVerse. All rights reserved.</p>
             <div className="flex items-center space-x-4 mt-4 sm:mt-0">
               <span className="text-foreground-muted text-sm">Made with</span>
               <span className="text-red-500">❤️</span>

@@ -106,7 +106,7 @@ export default function SignUpForm({ onStepChange }) {
   return (
     <Card className="w-full">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">Join Alumni Connect</CardTitle>
+        <CardTitle className="text-2xl font-bold">Join AlumniVerse</CardTitle>
         <CardDescription>Create your account to start networking with fellow alumni</CardDescription>
       </CardHeader>
       <CardContent>

@@ -1,4 +1,4 @@
-import { Card, CardContent } from "./ui/Card"
+import { Card, CardContent } from "./ui/card"
 
 const testimonials = [
   {
@@ -6,7 +6,7 @@ const testimonials = [
     role: "Software Engineer at Google",
     batch: "Class of 2020",
     content:
-      "Alumni Connect helped me land my dream job at Google through a referral from a senior. The platform made networking so much easier!",
+      "AlumniVerse helped me land my dream job at Google through a referral from a senior. The platform made networking so much easier!",
     avatar: "PS",
     rating: 5,
   },
@@ -24,7 +24,7 @@ const testimonials = [
     role: "Startup Founder",
     batch: "Class of 2019",
     content:
-      "Found my co-founder and first employees through Alumni Connect. The platform is a game-changer for entrepreneurial alumni.",
+      "Found my co-founder and first employees through AlumniVerse. The platform is a game-changer for entrepreneurial alumni.",
     avatar: "AP",
     rating: 5,
   },

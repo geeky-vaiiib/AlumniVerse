@@ -2,7 +2,7 @@ import "./globals.css"
 import { AuthProvider } from "@/components/providers/AuthProvider"
 
 export const metadata = {
-  title: "Alumni Connect - Professional Networking Platform",
+  title: "AlumniVerse - Professional Networking Platform",
   description: "Connect, engage, and thrive together with your alumni network",
     generator: 'v0.app'
 }

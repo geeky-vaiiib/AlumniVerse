@@ -8,7 +8,68 @@ const { supabase, supabaseAdmin, supabaseHelpers } = require('../config/supabase
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
 
 /**
- * Sign up new user with SIT email validation
+ * Parse USN from SIT email to extract student information
+ */
+const parseUSNFromEmail = (email) => {
+  try {
+    const localPart = email.split('@')[0]; // e.g., "1si23is117"
+    
+    // Validate USN format (should be like: 1si23is117)
+    const usnRegex = /^(\d)([a-z]{2})(\d{2})([a-z]{2})(\d{3})$/i;
+    const match = localPart.match(usnRegex);
+    
+    if (!match) {
+      throw new Error('Invalid USN format in email');
+    }
+
+    const [, , , yearDigits, branchCode] = match;
+    
+    // Convert year digits to full year (23 -> 2023)
+    const currentYear = new Date().getFullYear();
+    const currentYearLastTwo = currentYear % 100;
+    let joiningYear;
+    
+    const year = parseInt(yearDigits);
+    if (year <= currentYearLastTwo + 5) { // Allow up to 5 years in future
+      joiningYear = 2000 + year;
+    } else {
+      joiningYear = 1900 + year;
+    }
+
+    // Branch code mapping
+    const branchMap = {
+      'cs': 'Computer Science',
+      'is': 'Information Science',
+      'ec': 'Electronics and Communication',
+      'ee': 'Electrical Engineering',
+      'me': 'Mechanical Engineering',
+      'cv': 'Civil Engineering',
+      'bt': 'Biotechnology',
+      'ch': 'Chemical Engineering',
+      'ae': 'Aeronautical Engineering',
+      'im': 'Industrial Engineering and Management',
+      'tc': 'Telecommunication Engineering'
+    };
+
+    const branchName = branchMap[branchCode.toLowerCase()];
+    if (!branchName) {
+      throw new Error(`Unknown branch code: ${branchCode}`);
+    }
+
+    return {
+      usn: localPart.toUpperCase(),
+      joiningYear,
+      passingYear: joiningYear + 4, // Assuming 4-year degree
+      branch: branchName,
+      branchCode: branchCode.toUpperCase()
+    };
+  } catch (error) {
+    throw new Error(`Failed to parse USN: ${error.message}`);
+  }
+};
+
+/**
+ * Sign up new user with SIT email validation and automatic USN parsing
  */
 const signup = catchAsync(async (req, res, next) => {
   const errors = validationResult(req);
@@ -16,15 +77,39 @@ const signup = catchAsync(async (req, res, next) => {
     return next(new AppError('Validation failed', 400));
   }
 
-  const { firstName, lastName, email, password, usn, branch, admissionYear, passingYear } = req.body;
+  const { firstName, lastName, email, password } = req.body;
+  const operationId = `signup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+  console.log(`[${operationId}] Starting signup process for email: ${email}`);
 
   // Validate SIT email domain
   if (!email.endsWith('@sit.ac.in')) {
-    return next(new AppError('Only SIT email addresses are allowed', 400));
+    console.log(`[${operationId}] Invalid email domain: ${email}`);
+    return next(new AppError('Only SIT email addresses (@sit.ac.in) are allowed', 400));
   }
 
+  // Parse USN information from email
+  let parsedUSN;
   try {
+    parsedUSN = parseUSNFromEmail(email);
+    console.log(`[${operationId}] Parsed USN data:`, parsedUSN);
+  } catch (error) {
+    console.log(`[${operationId}] USN parsing failed:`, error.message);
+    return next(new AppError(`Invalid email format. Expected format: USN@sit.ac.in (e.g., 1si23is117@sit.ac.in). ${error.message}`, 400));
+  }
+
+  let authUserId = null;
+
+  try {
+    // Check if user already exists
+    const existingUser = await supabaseHelpers.users.findByEmail(email);
+    if (existingUser) {
+      console.log(`[${operationId}] User already exists with email: ${email}`);
+      return next(new AppError('User with this email already exists', 409));
+    }
+
     // Create user in Supabase Auth
+    console.log(`[${operationId}] Creating auth user...`);
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -32,37 +117,45 @@ const signup = catchAsync(async (req, res, next) => {
       user_metadata: {
         first_name: firstName,
         last_name: lastName,
-        usn,
-        branch,
-        admission_year: admissionYear,
-        passing_year: passingYear
+        usn: parsedUSN.usn,
+        branch: parsedUSN.branch,
+        joining_year: parsedUSN.joiningYear,
+        passing_year: parsedUSN.passingYear
       }
     });
 
     if (authError) {
+      console.error(`[${operationId}] Auth user creation failed:`, authError);
       if (authError.message.includes('already registered')) {
         return next(new AppError('User with this email already exists', 409));
       }
       throw authError;
     }
 
-    // Create user profile in our users table
+    authUserId = authData.user.id;
+    console.log(`[${operationId}] Auth user created successfully with ID: ${authUserId}`);
+
+    // Create user profile in our users table using admin client (bypasses RLS)
     const userProfile = {
-      auth_id: authData.user.id,
+      auth_id: authUserId,
       first_name: firstName,
       last_name: lastName,
       email,
-      usn,
-      branch,
-      admission_year: admissionYear,
-      passing_year: passingYear,
+      usn: parsedUSN.usn,
+      branch: parsedUSN.branch,
+      admission_year: parsedUSN.joiningYear,
+      passing_year: parsedUSN.passingYear,
       is_email_verified: false,
+      is_profile_complete: false,
       role: 'user'
     };
 
-    const createdUser = await supabaseHelpers.users.create(userProfile);
+    console.log(`[${operationId}] Creating user profile...`);
+    const createdUser = await supabaseHelpers.users.adminCreate(userProfile);
+    console.log(`[${operationId}] User profile created successfully with ID: ${createdUser.id}`);
 
     // Send email verification
+    console.log(`[${operationId}] Sending email verification...`);
     const { error: emailError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'signup',
       email,
@@ -72,9 +165,13 @@ const signup = catchAsync(async (req, res, next) => {
     });
 
     if (emailError) {
-      console.error('Email verification error:', emailError);
+      console.error(`[${operationId}] Email verification error:`, emailError);
       // Don't fail the signup if email sending fails
+    } else {
+      console.log(`[${operationId}] Email verification sent successfully`);
     }
+
+    console.log(`[${operationId}] Signup completed successfully`);
 
     res.status(201).json({
       success: true,
@@ -85,14 +182,36 @@ const signup = catchAsync(async (req, res, next) => {
           email: createdUser.email,
           firstName: createdUser.first_name,
           lastName: createdUser.last_name,
-          isEmailVerified: createdUser.is_email_verified
+          usn: createdUser.usn,
+          branch: createdUser.branch,
+          joiningYear: createdUser.admission_year,
+          passingYear: createdUser.passing_year,
+          isEmailVerified: createdUser.is_email_verified,
+          isProfileComplete: createdUser.is_profile_complete
         }
       }
     });
 
   } catch (error) {
-    console.error('Signup error:', error);
-    return next(new AppError('Failed to create account', 500));
+    console.error(`[${operationId}] Signup error:`, error);
+
+    // Cleanup: If profile creation failed but auth user was created, delete the auth user
+    if (authUserId) {
+      try {
+        console.log(`[${operationId}] Cleaning up auth user: ${authUserId}`);
+        await supabaseAdmin.auth.admin.deleteUser(authUserId);
+        console.log(`[${operationId}] Auth user cleanup completed`);
+      } catch (cleanupError) {
+        console.error(`[${operationId}] Failed to cleanup auth user:`, cleanupError);
+      }
+    }
+
+    // Return user-friendly error message
+    if (error.message && error.message.includes('duplicate key')) {
+      return next(new AppError('An account with this email or USN already exists', 409));
+    }
+
+    return next(new AppError('Account created but profile setup failed. Please contact support.', 500));
   }
 });
 
@@ -121,8 +240,8 @@ const signin = catchAsync(async (req, res, next) => {
       throw authError;
     }
 
-    // Get user profile from our database
-    const userProfile = await supabaseHelpers.users.findByAuthId(authData.user.id);
+    // Get user profile from our database using admin helper
+    const userProfile = await supabaseHelpers.users.adminFindByAuthId(authData.user.id);
     
     if (!userProfile) {
       return next(new AppError('User profile not found', 404));
@@ -206,9 +325,9 @@ const verifyEmail = catchAsync(async (req, res, next) => {
     }
 
     // Update user profile to mark email as verified
-    const userProfile = await supabaseHelpers.users.findByAuthId(data.user.id);
+    const userProfile = await supabaseHelpers.users.adminFindByAuthId(data.user.id);
     if (userProfile) {
-      await supabaseHelpers.users.update(userProfile.id, {
+      await supabaseHelpers.users.adminUpdate(userProfile.id, {
         is_email_verified: true
       });
     }
@@ -349,14 +468,9 @@ const getCurrentUser = catchAsync(async (req, res, next) => {
 const signupValidation = [
   body('firstName').trim().isLength({ min: 2, max: 50 }).withMessage('First name must be 2-50 characters'),
   body('lastName').trim().isLength({ min: 2, max: 50 }).withMessage('Last name must be 2-50 characters'),
-  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid email'),
+  body('email').isEmail().normalizeEmail().withMessage('Please provide a valid SIT email address'),
   body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters')
-    .matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/)
-    .withMessage('Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character'),
-  body('usn').optional().trim().isLength({ min: 3, max: 20 }).withMessage('USN must be 3-20 characters'),
-  body('branch').optional().trim().isLength({ min: 2, max: 100 }).withMessage('Branch must be 2-100 characters'),
-  body('admissionYear').optional().isInt({ min: 2000, max: new Date().getFullYear() }).withMessage('Invalid admission year'),
-  body('passingYear').optional().isInt({ min: 2000, max: new Date().getFullYear() + 10 }).withMessage('Invalid passing year')
+    .notEmpty().withMessage('Password is required')
 ];
 
 const signinValidation = [

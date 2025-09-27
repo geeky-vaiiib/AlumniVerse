@@ -1,10 +1,9 @@
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/Card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./ui/card"
 
 const features = [
   {
     title: "Alumni Directory",
-    description:
-      "Comprehensive searchable database of alumni with advanced filtering by batch, location, industry, and skills.",
+    description: "Comprehensive directory of verified alumni with advanced search and filtering capabilities.",
     icon: "👥",
     gradient: "from-primary to-secondary",
   },
