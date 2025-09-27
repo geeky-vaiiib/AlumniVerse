@@ -11,14 +11,15 @@ const path = require('path');
 const { globalErrorHandler, notFound } = require('./middlewares/errorMiddleware');
 
 // Import routes
-const authRoutes = require('./routes/authRoutes');
+// const authRoutes = require('./routes/authRoutes'); // Legacy auth (disabled)
 const supabaseAuthRoutes = require('./routes/supabaseAuthRoutes');
 const supabaseStorageRoutes = require('./routes/supabaseStorageRoutes');
-const userRoutes = require('./routes/userRoutes');
-const directoryRoutes = require('./routes/directoryRoutes');
-const jobsRoutes = require('./routes/jobsRoutes');
-const eventsRoutes = require('./routes/eventsRoutes');
-const badgesRoutes = require('./routes/badgesRoutes');
+// Temporarily disabled until we update middleware to use Supabase
+// const userRoutes = require('./routes/userRoutes');
+// const directoryRoutes = require('./routes/directoryRoutes');
+// const jobsRoutes = require('./routes/jobsRoutes');
+// const eventsRoutes = require('./routes/eventsRoutes');
+// const badgesRoutes = require('./routes/badgesRoutes');
 
 /**
  * AlumniVerse Backend Server
@@ -127,14 +128,15 @@ app.get('/health', (req, res) => {
 });
 
 // API routes
-app.use('/api/auth', authLimiter, authRoutes); // Legacy auth (keep for backward compatibility)
-app.use('/api/supabase-auth', authLimiter, supabaseAuthRoutes); // New Supabase auth
+app.use('/api/auth', authLimiter, supabaseAuthRoutes); // Supabase auth (primary)
+// app.use('/api/auth-legacy', authLimiter, authRoutes); // Legacy auth (disabled)
 app.use('/api/storage', supabaseStorageRoutes); // Supabase storage
-app.use('/api/users', userRoutes);
-app.use('/api/directory', directoryRoutes);
-app.use('/api/jobs', jobsRoutes);
-app.use('/api/events', eventsRoutes);
-app.use('/api/badges', badgesRoutes);
+// Temporarily disabled until we update middleware to use Supabase
+// app.use('/api/users', userRoutes);
+// app.use('/api/directory', directoryRoutes);
+// app.use('/api/jobs', jobsRoutes);
+// app.use('/api/events', eventsRoutes);
+// app.use('/api/badges', badgesRoutes);
 
 // API documentation endpoint
 app.get('/api', (req, res) => {
