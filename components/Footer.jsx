@@ -91,10 +91,10 @@ export default function Footer() {
             <ul className="space-y-2 text-sm">
               <li>
                 <a
-                  href="mailto:support@alumniconnect.com"
+                  href="mailto:support@alumniverse.com"
                   className="text-foreground-muted hover:text-foreground transition-colors"
                 >
-                  support@alumniconnect.com
+                  support@alumniverse.com
                 </a>
               </li>
               <li>
