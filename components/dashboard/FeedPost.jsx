@@ -70,9 +70,19 @@ export default function FeedPost({ post, onLike }) {
         {/* Content */}
         <div className="mb-4">
           <p className="text-foreground leading-relaxed">{post.content}</p>
+          {/* Handle single image or image array */}
           {post.image && (
             <div className="mt-3 rounded-lg overflow-hidden">
               <img src={post.image || "/placeholder.svg"} alt="Post content" className="w-full h-auto" />
+            </div>
+          )}
+          {post.images && post.images.length > 0 && (
+            <div className="mt-3 grid gap-2">
+              {post.images.map((imageUrl, index) => (
+                <div key={index} className="rounded-lg overflow-hidden">
+                  <img src={imageUrl} alt={`Post content ${index + 1}`} className="w-full h-auto" />
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -81,7 +91,7 @@ export default function FeedPost({ post, onLike }) {
         <div className="flex items-center justify-between text-sm text-foreground-muted mb-4 pb-4 border-b border-border-subtle">
           <div className="flex items-center space-x-4">
             <span>{post.likes} likes</span>
-            <span>{post.comments} comments</span>
+            <span>{Array.isArray(post.comments) ? post.comments.length : post.comments} comments</span>
             <span>{post.shares} shares</span>
           </div>
         </div>

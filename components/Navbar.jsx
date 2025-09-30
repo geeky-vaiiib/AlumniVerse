@@ -14,6 +14,17 @@ export default function Navbar() {
     router.push('/')
   }
 
+  const scrollToSection = (sectionId) => {
+    const element = document.getElementById(sectionId)
+    if (element) {
+      element.scrollIntoView({
+        behavior: 'smooth',
+        block: 'start'
+      })
+    }
+    setIsMenuOpen(false) // Close mobile menu after clicking
+  }
+
   return (
     <nav className="sticky top-0 z-50 glass border-b border-border-subtle">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -31,12 +42,13 @@ export default function Navbar() {
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-8">
               {!user && (
-                <a
-                  href="#features"
-                  className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors"
+                <button
+                  onClick={() => scrollToSection('features')}
+                  className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer relative group"
                 >
                   Features
-                </a>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                </button>
               )}
               {user && (
                 <>
@@ -67,12 +79,22 @@ export default function Navbar() {
                 </>
               )}
               {!user && (
-                <a
-                  href="#about"
-                  className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors"
-                >
-                About
-                </a>
+                <>
+                  <button
+                    onClick={() => scrollToSection('about')}
+                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer relative group"
+                  >
+                  About
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                  </button>
+                  <button
+                    onClick={() => scrollToSection('footer')}
+                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer relative group"
+                  >
+                  Contact
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -81,11 +103,12 @@ export default function Navbar() {
           <div className="hidden md:flex items-center space-x-4">
             {!user && !loading && (
               <>
-                <button className="text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+                <button className="text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors relative group">
                   <a href="/auth">Login</a>
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
                 </button>
                 <button className="bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors hover-glow">
-                  <a href="/auth">Get Started</a>
+                  <a href="/auth?mode=signup">Get Started</a>
                 </button>
               </>
             )}
@@ -121,12 +144,13 @@ export default function Navbar() {
         {isMenuOpen && (
           <div className="md:hidden">
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-border-subtle">
-              <a
-                href="#features"
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium"
+              <button
+                onClick={() => scrollToSection('features')}
+                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left relative group"
               >
                 Features
-              </a>
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+              </button>
               <a
                 href="/directory"
                 className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium"
@@ -145,19 +169,28 @@ export default function Navbar() {
               >
                 Dashboard
               </a>
-              <a
-                href="#about"
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium"
+              <button
+                onClick={() => scrollToSection('about')}
+                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left relative group"
               >
                 About
-              </a>
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+              </button>
+              <button
+                onClick={() => scrollToSection('footer')}
+                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left relative group"
+              >
+                Contact
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+              </button>
               <div className="pt-4 pb-3 border-t border-border-subtle">
                 <div className="flex items-center space-x-3">
-                  <button className="w-full text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+                  <button className="w-full text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors relative group">
                     <a href="/auth">Login</a>
+                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
                   </button>
                   <button className="w-full bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors">
-                    <a href="/auth">Get Started</a>
+                    <a href="/auth?mode=signup">Get Started</a>
                   </button>
                 </div>
               </div>

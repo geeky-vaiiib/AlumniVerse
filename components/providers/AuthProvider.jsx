@@ -24,6 +24,28 @@ export function AuthProvider({ children }) {
   const supabase = createClient()
 
   useEffect(() => {
+    // DEMO MODE: Check if we're in demo mode (check localStorage, cookie, or URL)
+    const isDemo = typeof window !== 'undefined' && (
+      window.location.pathname === '/dashboard' || 
+      localStorage.getItem('demoMode') === 'true' ||
+      document.cookie.includes('demoMode=true')
+    )
+
+    if (isDemo) {
+      // Set a mock user for demo mode
+      setUser({
+        id: 'demo-user-123',
+        email: 'demo@example.com',
+        user_metadata: {
+          firstName: 'Demo',
+          lastName: 'User'
+        }
+      })
+      setLoading(false)
+      localStorage.setItem('demoMode', 'true')
+      return
+    }
+
     // Get initial session
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()

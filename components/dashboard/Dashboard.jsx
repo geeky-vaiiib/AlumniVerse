@@ -7,6 +7,11 @@ import RightSidebar from "./RightSidebar"
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("feed")
+  const [posts, setPosts] = useState([])
+
+  const handleAddPost = (newPost) => {
+    setPosts(prevPosts => [newPost, ...prevPosts])
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -50,12 +55,12 @@ export default function Dashboard() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Sidebar */}
           <div className="lg:w-80 flex-shrink-0">
-            <DashboardSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+            <DashboardSidebar activeTab={activeTab} onTabChange={setActiveTab} onAddPost={handleAddPost} />
           </div>
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            <MainFeed activeTab={activeTab} />
+            <MainFeed activeTab={activeTab} userPosts={posts} />
           </div>
 
           {/* Right Sidebar */}

@@ -42,6 +42,27 @@ export default function SignUpForm({ onStepChange }) {
     setIsLoading(true)
     setErrors({})
 
+    // BYPASS: Skip all validation and authentication
+    // Just check if basic fields are filled
+    if (!formData.email?.trim() || !formData.password || !formData.firstName?.trim()) {
+      setErrors({ email: "Please fill in the required fields" })
+      setIsLoading(false)
+      return
+    }
+
+    // Simulate loading delay then go to OTP verification
+    setTimeout(() => {
+      setIsLoading(false)
+      // Move to OTP verification step with user data
+      onStepChange("otp", {
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        password: formData.password
+      })
+    }, 1000)
+
+    /* ORIGINAL CODE COMMENTED OUT FOR BYPASS
     // Comprehensive validation
     const validation = validateSignupData(formData)
 
@@ -86,6 +107,7 @@ export default function SignUpForm({ onStepChange }) {
     } finally {
       setIsLoading(false)
     }
+    */
   }
 
   const handleChange = (e) => {
@@ -108,6 +130,9 @@ export default function SignUpForm({ onStepChange }) {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Join AlumniVerse</CardTitle>
         <CardDescription>Create your account to start networking with fellow alumni</CardDescription>
+        <div className="mt-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+          Demo Mode: Fill in any details to continue
+        </div>
       </CardHeader>
       <CardContent>
         {errors.general && (

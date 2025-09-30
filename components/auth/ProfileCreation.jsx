@@ -1,23 +1,21 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 
 const steps = [
-  { id: 1, title: "Basic Info", description: "Academic details" },
-  { id: 2, title: "Professional", description: "Career information" },
-  { id: 3, title: "Social Links", description: "Connect your profiles" },
+  { id: 1, title: "Professional", description: "Career information" },
+  { id: 2, title: "Social Links", description: "Connect your profiles" },
 ]
 
 export default function ProfileCreation({ userData, onStepChange }) {
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState(1)
   const [formData, setFormData] = useState({
-    usn: "",
-    branch: "",
-    yearOfAdmission: "",
-    batchOfPassing: "",
+    // Skip basic info - start with professional details
     currentCompany: "",
     designation: "",
     location: "",
@@ -72,14 +70,9 @@ export default function ProfileCreation({ userData, onStepChange }) {
   }
 
   const handleNext = () => {
-    const stepErrors = validateStep(currentStep)
-    if (Object.keys(stepErrors).length > 0) {
-      setErrors(stepErrors)
-      return
-    }
-
+    // Skip validation for demo mode
     setErrors({})
-    if (currentStep < 3) {
+    if (currentStep < 2) {
       setCurrentStep(currentStep + 1)
     }
   }
@@ -96,9 +89,42 @@ export default function ProfileCreation({ userData, onStepChange }) {
     // Simulate API call
     setTimeout(() => {
       setIsLoading(false)
-      // Redirect to dashboard
-      window.location.href = "/dashboard"
+      // Set demo mode flag in both localStorage and cookie
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('demoMode', 'true')
+        // Set cookie for middleware
+        document.cookie = 'demoMode=true; path=/; max-age=86400' // 24 hours
+      }
+      // Use multiple navigation methods for reliability
+      try {
+        router.push('/dashboard')
+      } catch (error) {
+        console.error('Router navigation failed:', error)
+        // Fallback to window.location
+        if (typeof window !== 'undefined') {
+          window.location.href = '/dashboard'
+        }
+      }
     }, 1500)
+  }
+
+  const handleSkip = () => {
+    // Set demo mode flag in both localStorage and cookie
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('demoMode', 'true')
+      // Set cookie for middleware
+      document.cookie = 'demoMode=true; path=/; max-age=86400' // 24 hours
+    }
+    // Skip profile setup and go directly to dashboard
+    try {
+      router.push('/dashboard')
+    } catch (error) {
+      console.error('Router navigation failed:', error)
+      // Fallback to window.location
+      if (typeof window !== 'undefined') {
+        window.location.href = '/dashboard'
+      }
+    }
   }
 
   return (
@@ -106,6 +132,9 @@ export default function ProfileCreation({ userData, onStepChange }) {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Complete Your Profile</CardTitle>
         <CardDescription>Help us personalize your alumni experience</CardDescription>
+        <div className="mt-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+          Demo Mode: Fill in any details to continue
+        </div>
 
         {/* Progress indicator */}
         <div className="flex justify-center mt-6">
@@ -127,84 +156,8 @@ export default function ProfileCreation({ userData, onStepChange }) {
       </CardHeader>
 
       <CardContent>
-        {/* Step 1: Basic Info */}
+        {/* Step 1: Professional Info */}
         {currentStep === 1 && (
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="usn" className="block text-sm font-medium text-foreground mb-2">
-                University Seat Number (USN)
-              </label>
-              <Input
-                id="usn"
-                name="usn"
-                value={formData.usn}
-                onChange={handleChange}
-                placeholder="1SI21CS001"
-                className={errors.usn ? "border-destructive" : ""}
-              />
-              {errors.usn && <p className="text-destructive text-sm mt-1">{errors.usn}</p>}
-            </div>
-
-            <div>
-              <label htmlFor="branch" className="block text-sm font-medium text-foreground mb-2">
-                Branch
-              </label>
-              <select
-                id="branch"
-                name="branch"
-                value={formData.branch}
-                onChange={handleChange}
-                className={`w-full h-10 px-3 py-2 text-sm bg-input border border-input rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${errors.branch ? "border-destructive" : ""}`}
-              >
-                <option value="">Select Branch</option>
-                <option value="Computer Science">Computer Science</option>
-                <option value="Information Science">Information Science</option>
-                <option value="Electronics">Electronics</option>
-                <option value="Mechanical">Mechanical</option>
-                <option value="Civil">Civil</option>
-                <option value="Electrical">Electrical</option>
-              </select>
-              {errors.branch && <p className="text-destructive text-sm mt-1">{errors.branch}</p>}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="yearOfAdmission" className="block text-sm font-medium text-foreground mb-2">
-                  Year of Admission
-                </label>
-                <Input
-                  id="yearOfAdmission"
-                  name="yearOfAdmission"
-                  type="number"
-                  value={formData.yearOfAdmission}
-                  onChange={handleChange}
-                  placeholder="2021"
-                  min="2010"
-                  max="2024"
-                  className={errors.yearOfAdmission ? "border-destructive" : ""}
-                />
-                {errors.yearOfAdmission && <p className="text-destructive text-sm mt-1">{errors.yearOfAdmission}</p>}
-              </div>
-
-              <div>
-                <label htmlFor="batchOfPassing" className="block text-sm font-medium text-foreground mb-2">
-                  Batch of Passing
-                </label>
-                <Input
-                  id="batchOfPassing"
-                  name="batchOfPassing"
-                  value={formData.batchOfPassing}
-                  readOnly
-                  className="bg-muted"
-                  placeholder="Auto-calculated"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Step 2: Professional Info */}
-        {currentStep === 2 && (
           <div className="space-y-4">
             <div>
               <label htmlFor="currentCompany" className="block text-sm font-medium text-foreground mb-2">
@@ -262,8 +215,8 @@ export default function ProfileCreation({ userData, onStepChange }) {
           </div>
         )}
 
-        {/* Step 3: Social Links */}
-        {currentStep === 3 && (
+        {/* Step 2: Social Links */}
+        {currentStep === 2 && (
           <div className="space-y-4">
             <div>
               <label htmlFor="linkedinUrl" className="block text-sm font-medium text-foreground mb-2">
@@ -308,18 +261,34 @@ export default function ProfileCreation({ userData, onStepChange }) {
 
         {/* Navigation buttons */}
         <div className="flex justify-between mt-8">
-          <Button variant="outline" onClick={handlePrevious} disabled={currentStep === 1}>
-            Previous
-          </Button>
-
-          {currentStep < 3 ? (
-            <Button onClick={handleNext} className="hover-glow">
-              Next
+          {currentStep === 1 ? (
+            <Button variant="outline" onClick={handleSkip}>
+              Skip Setup
             </Button>
           ) : (
-            <Button onClick={handleSubmit} className="hover-glow" disabled={isLoading}>
-              {isLoading ? "Creating Profile..." : "Complete Setup"}
+            <Button variant="outline" onClick={handlePrevious}>
+              Previous
             </Button>
+          )}
+
+          {currentStep < 2 ? (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleSkip}>
+                Skip
+              </Button>
+              <Button onClick={handleNext} className="hover-glow">
+                Next
+              </Button>
+            </div>
+          ) : (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={handleSkip}>
+                Skip
+              </Button>
+              <Button onClick={handleSubmit} className="hover-glow" disabled={isLoading}>
+                {isLoading ? "Creating Profile..." : "Complete Setup"}
+              </Button>
+            </div>
           )}
         </div>
       </CardContent>

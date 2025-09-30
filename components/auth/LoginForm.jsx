@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
@@ -8,6 +9,7 @@ import { signInUser } from "../../lib/services/authService"
 import { isValidInstitutionalEmail } from "../../lib/utils/emailParser"
 
 export default function LoginForm({ onStepChange }) {
+  const router = useRouter()
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -20,25 +22,36 @@ export default function LoginForm({ onStepChange }) {
     setIsLoading(true)
     setErrors({})
 
-    // Enhanced validation
-    const newErrors = {}
-
-    if (!formData.email?.trim()) {
-      newErrors.email = "Email is required"
-    } else if (!isValidInstitutionalEmail(formData.email)) {
-      newErrors.email = "Please use your institutional email (@sit.ac.in)"
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required"
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
+    // BYPASS: Skip all validation and authentication
+    // Just check if basic fields are filled
+    if (!formData.email?.trim() || !formData.password) {
+      setErrors({ email: "Please fill in both fields" })
       setIsLoading(false)
       return
     }
 
+    // Simulate loading delay then redirect to dashboard
+    setTimeout(() => {
+      setIsLoading(false)
+      // Set demo mode flag in both localStorage and cookie
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('demoMode', 'true')
+        // Set cookie for middleware
+        document.cookie = 'demoMode=true; path=/; max-age=86400' // 24 hours
+      }
+      // Use window.location for reliable navigation (bypasses SSR/router issues)
+      try {
+        window.location.href = "/dashboard"
+      } catch (error) {
+        console.error('Navigation error:', error)
+        // Fallback navigation method
+        if (typeof window !== 'undefined') {
+          window.location.replace('/dashboard')
+        }
+      }
+    }, 1000)
+
+    /* ORIGINAL CODE COMMENTED OUT FOR BYPASS
     try {
       // Attempt to sign in user
       const result = await signInUser(formData.email, formData.password)
@@ -56,6 +69,7 @@ export default function LoginForm({ onStepChange }) {
     } finally {
       setIsLoading(false)
     }
+    */
   }
 
   const handleChange = (e) => {
@@ -78,6 +92,9 @@ export default function LoginForm({ onStepChange }) {
       <CardHeader className="text-center">
         <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
         <CardDescription>Sign in to your alumni account to continue</CardDescription>
+        <div className="mt-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+          Demo Mode: Enter any email and password
+        </div>
       </CardHeader>
       <CardContent>
         {errors.general && (

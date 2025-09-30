@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useSearchParams } from "next/navigation"
 import LoginForm from "./LoginForm"
 import SignUpForm from "./SignUpForm"
 import OTPVerification from "./OTPVerification"
@@ -8,7 +9,9 @@ import ProfileCreation from "./ProfileCreation"
 import ForgotPassword from "./ForgotPassword"
 
 export default function AuthFlow() {
-  const [currentStep, setCurrentStep] = useState("login") // login, signup, otp, profile, forgot
+  const searchParams = useSearchParams()
+  const mode = searchParams.get('mode')
+  const [currentStep, setCurrentStep] = useState(mode === 'signup' ? 'signup' : 'login') // login, signup, otp, profile, forgot
   const [userData, setUserData] = useState({})
 
   const handleStepChange = (step, data = {}) => {

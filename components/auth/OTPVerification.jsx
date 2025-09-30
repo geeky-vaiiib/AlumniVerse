@@ -46,14 +46,15 @@ export default function OTPVerification({ email, onStepChange }) {
     e.preventDefault()
     const otpValue = otp.join("")
 
+    // BYPASS: Accept any 6-digit code for demo
     if (otpValue.length !== 6) {
-      alert("Please enter all 6 digits")
+      alert("Please enter all 6 digits (any 6 digits will work)")
       return
     }
 
     setIsLoading(true)
 
-    // Simulate API call
+    // Simulate API call - accept any OTP
     setTimeout(() => {
       setIsLoading(false)
       onStepChange("profile")
@@ -74,6 +75,9 @@ export default function OTPVerification({ email, onStepChange }) {
         <CardDescription>
           We've sent a 6-digit code to <strong>{email}</strong>
         </CardDescription>
+        <div className="mt-2 text-xs text-muted-foreground bg-muted/50 px-2 py-1 rounded">
+          Demo Mode: Enter any 6 digits (e.g., 123456)
+        </div>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
