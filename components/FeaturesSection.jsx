@@ -28,7 +28,7 @@ const features = [
   {
     title: "Gamification",
     description:
-      "Earn badges, build your reputation, and climb the leaderboard through active community participation.",
+      "Build your reputation, and climb the leaderboard through active community participation.",
     icon: "🏆",
     gradient: "from-primary to-warning",
   },

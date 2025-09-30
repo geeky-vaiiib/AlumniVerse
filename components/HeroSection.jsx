@@ -81,7 +81,7 @@ export default function HeroSection() {
                   <span className="text-2xl">🏆</span>
                 </div>
                 <h3 className="font-semibold text-foreground mb-2">Gamification</h3>
-                <p className="text-sm text-foreground-muted">Earn badges and climb the leaderboard</p>
+                <p className="text-sm text-foreground-muted">Participate in Events and Compitations</p>
               </div>
             </div>
           </div>

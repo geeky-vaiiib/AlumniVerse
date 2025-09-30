@@ -1,59 +1,16 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
-import { useAuth } from "../providers/AuthProvider"
-import { useRealTimeUpdates } from "../../hooks/useRealTime"
+import { useState } from "react"
 import DashboardSidebar from "./DashboardSidebar"
 import MainFeed from "./MainFeed"
-import NewsFeed from "./NewsFeed"
 import RightSidebar from "./RightSidebar"
-import AlumniDirectory from "./AlumniDirectory"
-import JobBoard from "./JobBoard"
-import EventsPage from "./EventsPage"
-import BadgesPage from "./BadgesPage"
-import UserProfileCard from "./UserProfileCard"
-import LoadingSpinner from "../ui/LoadingSpinner"
 
 export default function Dashboard() {
-  const router = useRouter()
-  const { user, isLoggedIn, loading } = useAuth()
   const [activeTab, setActiveTab] = useState("feed")
-  const [isLoading, setIsLoading] = useState(true)
+  const [posts, setPosts] = useState([])
 
-  // Initialize real-time updates
-  useRealTimeUpdates()
-
-  useEffect(() => {
-    // Check authentication
-    if (!loading) {
-      if (!isLoggedIn && !user) {
-        router.push('/auth')
-        return
-      }
-      setIsLoading(false)
-    }
-  }, [isLoggedIn, user, loading, router])
-
-  if (isLoading || loading) {
-    return <LoadingSpinner message="Loading dashboard..." />
-  }
-
-  const renderMainContent = () => {
-    switch (activeTab) {
-      case "feed":
-        return <NewsFeed />
-      case "directory":
-        return <AlumniDirectory />
-      case "jobs":
-        return <JobBoard />
-      case "events":
-        return <EventsPage />
-      case "badges":
-        return <BadgesPage />
-      default:
-        return <NewsFeed />
-    }
+  const handleAddPost = (newPost) => {
+    setPosts(prevPosts => [newPost, ...prevPosts])
   }
 
   return (
@@ -98,12 +55,12 @@ export default function Dashboard() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Sidebar */}
           <div className="lg:w-80 flex-shrink-0">
-            <DashboardSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+            <DashboardSidebar activeTab={activeTab} onTabChange={setActiveTab} onAddPost={handleAddPost} />
           </div>
 
           {/* Main Content */}
           <div className="flex-1 min-w-0">
-            {renderMainContent()}
+            <MainFeed activeTab={activeTab} userPosts={posts} />
           </div>
 
           {/* Right Sidebar */}

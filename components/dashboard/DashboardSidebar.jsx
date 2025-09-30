@@ -1,8 +1,9 @@
 "use client"
 
-import Link from "next/link"
+import { useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
+import { Input } from "../ui/input"
 import { generateAvatar } from "../../lib/utils"
 
 // Mock user data
@@ -27,8 +28,139 @@ const quickActions = [
   { id: "mentorship", label: "Offer Mentorship", icon: "🤝", color: "from-warning to-primary" },
 ]
 
-export default function DashboardSidebar({ activeTab, onTabChange }) {
+// Modal Component
+function Modal({ isOpen, onClose, title, children }) {
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-background rounded-lg shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-6 border-b border-border-subtle">
+          <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+          <button
+            onClick={onClose}
+            className="text-foreground-muted hover:text-foreground p-1 rounded-full hover:bg-surface-hover"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="p-6">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// File Upload Component
+function FileUpload({ onFileSelect, accept, label, multiple = false }) {
+  const [dragActive, setDragActive] = useState(false)
+  const [selectedFiles, setSelectedFiles] = useState([])
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragActive(false)
+    const files = Array.from(e.dataTransfer.files)
+    setSelectedFiles(files)
+    onFileSelect(files)
+  }
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files)
+    setSelectedFiles(files)
+    onFileSelect(files)
+  }
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-sm font-medium text-foreground">{label}</label>
+      <div
+        className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
+          dragActive
+            ? 'border-primary bg-primary/5'
+            : 'border-border hover:border-primary/50'
+        }`}
+        onDragEnter={() => setDragActive(true)}
+        onDragLeave={() => setDragActive(false)}
+        onDragOver={(e) => e.preventDefault()}
+        onDrop={handleDrop}
+      >
+        <div className="space-y-2">
+          <div className="text-2xl">📁</div>
+          <div className="text-sm text-foreground-muted">
+            Drop files here or{' '}
+            <label className="text-primary cursor-pointer hover:underline">
+              browse
+              <input
+                type="file"
+                className="hidden"
+                accept={accept}
+                multiple={multiple}
+                onChange={handleFileChange}
+              />
+            </label>
+          </div>
+          {selectedFiles.length > 0 && (
+            <div className="text-xs text-foreground-muted mt-2">
+              {selectedFiles.map((file, index) => (
+                <div key={index} className="truncate">📄 {file.name}</div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default function DashboardSidebar({ activeTab, onTabChange, onAddPost }) {
   const avatar = generateAvatar(currentUser.name)
+  const [activeModal, setActiveModal] = useState(null)
+  const [formData, setFormData] = useState({})
+  const [uploadedFiles, setUploadedFiles] = useState([])
+
+  const handleQuickAction = (actionId) => {
+    setActiveModal(actionId)
+    setFormData({})
+    setUploadedFiles([])
+  }
+
+  const closeModal = () => {
+    setActiveModal(null)
+    setFormData({})
+    setUploadedFiles([])
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    // Create new post/content based on modal type
+    if (activeModal === 'post' && onAddPost) {
+      const newPost = {
+        id: Date.now(),
+        author: {
+          name: currentUser.name,
+          avatar: generateAvatar(currentUser.name),
+          title: currentUser.designation,
+          company: currentUser.company,
+          batch: currentUser.batch
+        },
+        content: formData.content || '',
+        type: formData.type || 'general',
+        timestamp: new Date().toISOString(),
+        likes: 0,
+        comments: [],
+        shares: 0,
+        images: uploadedFiles.map(file => URL.createObjectURL(file))
+      }
+      onAddPost(newPost)
+    }
+    
+    // Show success message
+    alert(`${activeModal === 'post' ? 'Post' : activeModal === 'job' ? 'Job' : activeModal === 'achievement' ? 'Achievement' : 'Mentorship offer'} submitted successfully!`)
+    
+    closeModal()
+  }
 
   return (
     <div className="space-y-6">
@@ -124,7 +256,6 @@ export default function DashboardSidebar({ activeTab, onTabChange }) {
           <nav className="space-y-1">
             {[
               { id: "feed", label: "News Feed", icon: "🏠" },
-              { id: "directory", label: "Alumni Directory", icon: "👥" },
               { id: "jobs", label: "Job Board", icon: "💼" },
               { id: "events", label: "Events", icon: "📅" },
               { id: "badges", label: "Badges", icon: "🏆" },
@@ -156,6 +287,7 @@ export default function DashboardSidebar({ activeTab, onTabChange }) {
             {quickActions.map((action) => (
               <button
                 key={action.id}
+                onClick={() => handleQuickAction(action.id)}
                 className="p-3 rounded-lg border border-border hover:border-primary transition-all duration-300 hover:scale-105 group"
               >
                 <div
@@ -172,16 +304,304 @@ export default function DashboardSidebar({ activeTab, onTabChange }) {
         </CardContent>
       </Card>
 
-      {/* Back to Flow View */}
+      {/* Logout */}
       <Card>
         <CardContent className="p-4">
-          <Link href="/">
-            <Button variant="outline" className="w-full bg-transparent">
-              Back to Flow View
-            </Button>
-          </Link>
+          <Button variant="outline" className="w-full bg-transparent">
+            <a href="/">Logout</a>
+          </Button>
         </CardContent>
       </Card>
+
+      {/* Modals */}
+      {/* Create Post Modal */}
+      <Modal
+        isOpen={activeModal === 'post'}
+        onClose={closeModal}
+        title="✏️ Create New Post"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Post Content</label>
+            <textarea
+              className="w-full p-3 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={4}
+              placeholder="What's on your mind? Share with your alumni network..."
+              value={formData.content || ''}
+              onChange={(e) => setFormData({...formData, content: e.target.value})}
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Post Type</label>
+            <select
+              className="w-full p-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background"
+              value={formData.type || 'general'}
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+            >
+              <option value="general" className="text-foreground bg-background">💬 General</option>
+              <option value="achievement" className="text-foreground bg-background">🏆 Achievement</option>
+              <option value="job" className="text-foreground bg-background">💼 Job Related</option>
+              <option value="mentorship" className="text-foreground bg-background">🤝 Mentorship</option>
+            </select>
+          </div>
+
+          <FileUpload
+            label="Attach Images (Optional)"
+            accept="image/*"
+            multiple={true}
+            onFileSelect={setUploadedFiles}
+          />
+
+          <div className="flex space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={closeModal} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1 hover-glow">
+              Share Post
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Post Job Modal */}
+      <Modal
+        isOpen={activeModal === 'job'}
+        onClose={closeModal}
+        title="💼 Post Job Opportunity"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Job Title</label>
+              <Input
+                placeholder="e.g., Senior Software Engineer"
+                value={formData.title || ''}
+                onChange={(e) => setFormData({...formData, title: e.target.value})}
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Company</label>
+              <Input
+                placeholder="e.g., Google, Microsoft"
+                value={formData.company || ''}
+                onChange={(e) => setFormData({...formData, company: e.target.value})}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Location</label>
+                <Input
+                  placeholder="e.g., Bangalore"
+                  value={formData.location || ''}
+                  onChange={(e) => setFormData({...formData, location: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Experience</label>
+                <Input
+                  placeholder="e.g., 2-4 years"
+                  value={formData.experience || ''}
+                  onChange={(e) => setFormData({...formData, experience: e.target.value})}
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Job Description</label>
+              <textarea
+                className="w-full p-3 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                rows={3}
+                placeholder="Brief description of the role and requirements..."
+                value={formData.description || ''}
+                onChange={(e) => setFormData({...formData, description: e.target.value})}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-foreground mb-2">Apply Link/Email</label>
+              <Input
+                placeholder="e.g., careers@company.com or application URL"
+                value={formData.applyLink || ''}
+                onChange={(e) => setFormData({...formData, applyLink: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <FileUpload
+            label="Job Description File (Optional)"
+            accept=".pdf,.doc,.docx"
+            onFileSelect={setUploadedFiles}
+          />
+
+          <div className="flex space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={closeModal} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1 hover-glow">
+              Post Job
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Share Achievement Modal */}
+      <Modal
+        isOpen={activeModal === 'achievement'}
+        onClose={closeModal}
+        title="🏆 Share Your Achievement"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Achievement Title</label>
+            <Input
+              placeholder="e.g., Promoted to Senior Engineer, Won Hackathon"
+              value={formData.title || ''}
+              onChange={(e) => setFormData({...formData, title: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Achievement Type</label>
+            <select
+              className="w-full p-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background"
+              value={formData.type || 'career'}
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+            >
+              <option value="career" className="text-foreground bg-background">🚀 Career Milestone</option>
+              <option value="education" className="text-foreground bg-background">🎓 Educational Achievement</option>
+              <option value="award" className="text-foreground bg-background">🏅 Award/Recognition</option>
+              <option value="project" className="text-foreground bg-background">💡 Project Success</option>
+              <option value="personal" className="text-foreground bg-background">⭐ Personal Achievement</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Tell us about it!</label>
+            <textarea
+              className="w-full p-3 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={4}
+              placeholder="Share the details of your achievement and inspire others..."
+              value={formData.description || ''}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Date of Achievement</label>
+            <Input
+              type="date"
+              value={formData.date || ''}
+              onChange={(e) => setFormData({...formData, date: e.target.value})}
+            />
+          </div>
+
+          <FileUpload
+            label="Upload Certificate/Photos"
+            accept="image/*,.pdf"
+            multiple={true}
+            onFileSelect={setUploadedFiles}
+          />
+
+          <div className="flex space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={closeModal} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1 hover-glow">
+              Share Achievement
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Offer Mentorship Modal */}
+      <Modal
+        isOpen={activeModal === 'mentorship'}
+        onClose={closeModal}
+        title="🤝 Offer Mentorship"
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Areas of Expertise</label>
+            <Input
+              placeholder="e.g., Software Development, Product Management, Data Science"
+              value={formData.expertise || ''}
+              onChange={(e) => setFormData({...formData, expertise: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Mentorship Type</label>
+            <select
+              className="w-full p-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-foreground bg-background"
+              value={formData.type || 'career'}
+              onChange={(e) => setFormData({...formData, type: e.target.value})}
+            >
+              <option value="career" className="text-foreground bg-background">💼 Career Guidance</option>
+              <option value="technical" className="text-foreground bg-background">💻 Technical Skills</option>
+              <option value="interview" className="text-foreground bg-background">🎯 Interview Preparation</option>
+              <option value="entrepreneur" className="text-foreground bg-background">🚀 Entrepreneurship</option>
+              <option value="general" className="text-foreground bg-background">💬 General Life Advice</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Availability</label>
+            <select
+              className="w-full p-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              value={formData.availability || 'flexible'}
+              onChange={(e) => setFormData({...formData, availability: e.target.value})}
+            >
+              <option value="flexible">⏰ Flexible Schedule</option>
+              <option value="weekends">📅 Weekends Only</option>
+              <option value="evenings">🌅 Evenings (6-9 PM)</option>
+              <option value="limited">⚡ Limited Availability</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">About Your Mentorship</label>
+            <textarea
+              className="w-full p-3 border border-input rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+              rows={4}
+              placeholder="What can you help juniors with? What's your approach to mentoring?"
+              value={formData.description || ''}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground mb-2">Contact Method</label>
+            <select
+              className="w-full p-3 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+              value={formData.contact || 'platform'}
+              onChange={(e) => setFormData({...formData, contact: e.target.value})}
+            >
+              <option value="platform">💬 Through Platform Messages</option>
+              <option value="email">📧 Email Communication</option>
+              <option value="video">📹 Video Calls</option>
+              <option value="phone">📞 Phone Calls</option>
+            </select>
+          </div>
+
+          <FileUpload
+            label="Upload Resume/Portfolio (Optional)"
+            accept=".pdf,.doc,.docx"
+            onFileSelect={setUploadedFiles}
+          />
+
+          <div className="flex space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={closeModal} className="flex-1">
+              Cancel
+            </Button>
+            <Button type="submit" className="flex-1 hover-glow">
+              Offer Mentorship
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }
