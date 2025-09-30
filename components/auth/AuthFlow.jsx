@@ -1,71 +1,94 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import LoginForm from "./LoginForm"
 import SignUpForm from "./SignUpForm"
 import OTPVerification from "./OTPVerification"
-import ProfileCreation from "./ProfileCreation"
-import ForgotPassword from "./ForgotPassword"
+import ProfileCreationFlow from "./ProfileCreationFlow"
+import { useAuth } from "../providers/AuthProvider"
 
-export default function AuthFlow() {
-  const [currentStep, setCurrentStep] = useState("login") // login, signup, otp, profile, forgot
-  const [userData, setUserData] = useState({})
+export default function AuthFlow({ initialStep = 'login' }) {
+  const router = useRouter()
+  const { session, loading, isLoggedIn, isReady } = useAuth()
+  const [currentStep, setCurrentStep] = useState(initialStep)
+  const [authData, setAuthData] = useState({})
+
+  console.log('AuthFlow: Rendering with state -', {
+    loading,
+    isLoggedIn,
+    hasSession: !!session,
+    hasUser: !!session?.user,
+    currentStep,
+    isReady
+  })
+
+  // Simple auth check - no complex loading states
+  useEffect(() => {
+    console.log('AuthFlow: Auth check effect triggered', { isLoggedIn, hasSession: !!session })
+
+    if (isLoggedIn || session?.user) {
+      console.log('AuthFlow: User authenticated, redirecting to dashboard')
+      router.push('/dashboard')
+    }
+  }, [session, isLoggedIn, router])
 
   const handleStepChange = (step, data = {}) => {
+    console.log('Step change:', step, data)
     setCurrentStep(step)
-    setUserData((prev) => ({ ...prev, ...data }))
+    setAuthData(prev => ({ ...prev, ...data }))
   }
 
-  return (
-    <div className="min-h-screen bg-background flex">
-      {/* Left side - Auth forms */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
-          {currentStep === "login" && <LoginForm onStepChange={handleStepChange} />}
-          {currentStep === "signup" && <SignUpForm onStepChange={handleStepChange} />}
-          {currentStep === "otp" && <OTPVerification email={userData.email} onStepChange={handleStepChange} />}
-          {currentStep === "profile" && <ProfileCreation userData={userData} onStepChange={handleStepChange} />}
-          {currentStep === "forgot" && <ForgotPassword onStepChange={handleStepChange} />}
-        </div>
-      </div>
+  const handleProfileComplete = (profileData) => {
+    console.log('Profile creation completed:', profileData)
+    // Store profile data in context or send to API
+    setAuthData(prev => ({ ...prev, profile: profileData }))
+    // Redirect to dashboard
+    router.push('/dashboard')
+  }
 
-      {/* Right side - Feature showcase */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-primary/10 to-secondary/10 items-center justify-center p-8">
-        <div className="max-w-lg text-center">
-          <h2 className="text-3xl font-bold text-foreground mb-6">
-            Join Your <span className="gradient-text">Alumni Network</span>
-          </h2>
-          <div className="space-y-6">
-            <div className="flex items-center space-x-4 text-left">
-              <div className="w-12 h-12 bg-primary/20 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🎓</span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Connect with Alumni</h3>
-                <p className="text-foreground-muted text-sm">Find and connect with fellow graduates</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4 text-left">
-              <div className="w-12 h-12 bg-secondary/20 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">💼</span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Career Opportunities</h3>
-                <p className="text-foreground-muted text-sm">Access exclusive job postings and referrals</p>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4 text-left">
-              <div className="w-12 h-12 bg-accent/20 rounded-lg flex items-center justify-center">
-                <span className="text-2xl">🤝</span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Professional Growth</h3>
-                <p className="text-foreground-muted text-sm">Mentorship and networking opportunities</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
+  // No loading screens - render immediately to prevent infinite loading
+
+  // Render current step
+  switch (currentStep) {
+    case 'signup':
+      return (
+        <SignUpForm
+          onStepChange={handleStepChange}
+        />
+      )
+
+    case 'login':
+      return (
+        <LoginForm
+          onStepChange={handleStepChange}
+        />
+      )
+
+    case 'otp-verification':
+      return (
+        <OTPVerification
+          email={authData.email}
+          firstName={authData.firstName}
+          isSignUp={authData.isSignUp}
+          userData={authData.userData}
+          onStepChange={handleStepChange}
+        />
+      )
+
+    case 'profile':
+      return (
+        <ProfileCreationFlow
+          userData={authData}
+          onComplete={handleProfileComplete}
+        />
+      )
+
+    default:
+      return (
+        <LoginForm
+          onStepChange={handleStepChange}
+        />
+      )
+  }
 }

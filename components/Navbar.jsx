@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import Link from "next/link"
 import { useAuth } from "@/components/providers/AuthProvider"
 import { useRouter } from "next/navigation"
 
@@ -21,9 +22,9 @@ export default function Navbar() {
           {/* Logo */}
           <div className="flex items-center">
             <div className="flex-shrink-0">
-              <a href="/">
+              <Link href="/">
                 <h1 className="text-2xl font-bold gradient-text">AlumniVerse</h1>
-              </a>
+              </Link>
             </div>
           </div>
 

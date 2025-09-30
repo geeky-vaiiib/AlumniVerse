@@ -1,5 +1,6 @@
 "use client"
 
+import Link from "next/link"
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { generateAvatar } from "../../lib/utils"
@@ -174,9 +175,11 @@ export default function DashboardSidebar({ activeTab, onTabChange }) {
       {/* Back to Flow View */}
       <Card>
         <CardContent className="p-4">
-          <Button variant="outline" className="w-full bg-transparent">
-            <a href="/">Back to Flow View</a>
-          </Button>
+          <Link href="/">
+            <Button variant="outline" className="w-full bg-transparent">
+              Back to Flow View
+            </Button>
+          </Link>
         </CardContent>
       </Card>
     </div>

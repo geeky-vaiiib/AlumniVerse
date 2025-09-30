@@ -10,10 +10,13 @@ const path = require('path');
 // Import middleware
 const { globalErrorHandler, notFound } = require('./middlewares/errorMiddleware');
 
+// No custom services needed - using 100% Supabase
+
 // Import routes
 // const authRoutes = require('./routes/authRoutes'); // Legacy auth (disabled)
 const supabaseAuthRoutes = require('./routes/supabaseAuthRoutes');
 const supabaseStorageRoutes = require('./routes/supabaseStorageRoutes');
+const profileRoutes = require('./routes/profileRoutes'); // Enhanced profile routes
 // Temporarily disabled until we update middleware to use Supabase
 // const userRoutes = require('./routes/userRoutes');
 // const directoryRoutes = require('./routes/directoryRoutes');
@@ -131,6 +134,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authLimiter, supabaseAuthRoutes); // Supabase auth (primary)
 // app.use('/api/auth-legacy', authLimiter, authRoutes); // Legacy auth (disabled)
 app.use('/api/storage', supabaseStorageRoutes); // Supabase storage
+app.use('/api/profile', profileRoutes); // Enhanced profile routes
 // Temporarily disabled until we update middleware to use Supabase
 // app.use('/api/users', userRoutes);
 // app.use('/api/directory', directoryRoutes);
@@ -197,8 +201,8 @@ process.on('unhandledRejection', (err) => {
   process.exit(1);
 });
 
-// Start server
-const server = app.listen(PORT, () => {
+// Start server with email verification
+const server = app.listen(PORT, async () => {
   console.log(`
 🚀 AlumniVerse Backend Server Started Successfully!
 
@@ -206,7 +210,7 @@ const server = app.listen(PORT, () => {
    • Port: ${PORT}
    • Environment: ${process.env.NODE_ENV || 'development'}
    • API Base URL: http://localhost:${PORT}/api
-   
+
 🔗 Available Endpoints:
    • Health Check: http://localhost:${PORT}/health
    • API Documentation: http://localhost:${PORT}/api
@@ -222,7 +226,7 @@ const server = app.listen(PORT, () => {
    • Rate Limiting Active
    • Security Headers Applied
    • JWT Authentication Ready
-   
+
 📁 File Uploads:
    • Upload Directory: ./uploads
    • Max File Size: ${process.env.MAX_FILE_SIZE || '5MB'}
@@ -230,6 +234,9 @@ const server = app.listen(PORT, () => {
 
 Ready to serve the AlumniVerse frontend! 🎓
   `);
+
+  // Using Supabase Auth - no email service verification needed
+  console.log('\n✅ Supabase Auth ready!');
 });
 
 module.exports = app;

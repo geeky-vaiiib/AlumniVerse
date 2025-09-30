@@ -36,7 +36,19 @@ const supabaseHelpers = {
         .eq('email', email)
         .eq('is_deleted', false)
         .single();
-      
+
+      if (error && error.code !== 'PGRST116') throw error;
+      return data;
+    },
+
+    adminFindByEmail: async (email) => {
+      const { data, error } = await supabaseAdmin
+        .from('users')
+        .select('*')
+        .eq('email', email)
+        .eq('is_deleted', false)
+        .single();
+
       if (error && error.code !== 'PGRST116') throw error;
       return data;
     },

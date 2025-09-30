@@ -165,9 +165,10 @@ const EventsPage = () => {
       filtered = filtered.filter((event) => {
         const eDate = new Date(event.date)
         switch (filters.timeframe) {
-          case "this-week":
+          case "this-week": {
             const weekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
             return eDate >= now && eDate <= weekFromNow
+          }
           case "this-month":
             return eDate.getMonth() === now.getMonth() && eDate.getFullYear() === now.getFullYear()
           case "upcoming":

@@ -4,267 +4,284 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { signUpUser } from "../../lib/services/authService"
-import { parseInstitutionalEmail, validateSignupData } from "../../lib/utils/emailParser"
+import { GraduationCap, Mail, AlertCircle } from "lucide-react"
+import { useAuth } from "../providers/AuthProvider"
+import { parseInstitutionalEmail } from "../../lib/utils/emailParser"
 
 export default function SignUpForm({ onStepChange }) {
+  const { signUpWithOTP, isReady, error: authError } = useAuth()
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
-    password: "",
-    confirmPassword: "",
   })
   const [extractedData, setExtractedData] = useState(null)
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
+  const [submitCooldown, setSubmitCooldown] = useState(0)
+
+  // Cooldown timer effect
+  useEffect(() => {
+    if (submitCooldown > 0) {
+      const timer = setTimeout(() => {
+        setSubmitCooldown(prev => prev - 1)
+      }, 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [submitCooldown])
 
   // Auto-extract data when email changes
   useEffect(() => {
     if (formData.email && formData.email.includes('@')) {
-      const parsed = parseInstitutionalEmail(formData.email)
-      if (parsed.isValid) {
+      try {
+        const parsed = parseInstitutionalEmail(formData.email)
         setExtractedData(parsed)
-        // Clear email error if parsing is successful
-        if (errors.email) {
-          setErrors(prev => ({ ...prev, email: '' }))
-        }
-      } else {
+        setErrors(prev => ({ ...prev, email: "" }))
+      } catch (error) {
         setExtractedData(null)
+        if (formData.email.includes('@sit.ac.in')) {
+          setErrors(prev => ({ ...prev, email: error.message }))
+        }
       }
     } else {
       setExtractedData(null)
     }
   }, [formData.email])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setErrors({})
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: "" }))
+    }
+  }
 
-    // Comprehensive validation
-    const validation = validateSignupData(formData)
+  const validateForm = () => {
+    const newErrors = {}
 
-    // Additional validation for confirm password
-    if (formData.password !== formData.confirmPassword) {
-      validation.errors.confirmPassword = "Passwords do not match"
-      validation.isValid = false
+    // Validate required fields
+    if (!formData.firstName.trim()) {
+      newErrors.firstName = "First name is required"
+    }
+    if (!formData.lastName.trim()) {
+      newErrors.lastName = "Last name is required"
+    }
+    if (!formData.email.trim()) {
+      newErrors.email = "Email is required"
     }
 
-    if (!validation.isValid) {
-      setErrors(validation.errors)
-      setIsLoading(false)
+    // Validate email format and domain
+    if (formData.email && !formData.email.endsWith('@sit.ac.in')) {
+      newErrors.email = "Please use your SIT institutional email (@sit.ac.in)"
+    }
+
+    // Validate extracted data
+    if (formData.email.endsWith('@sit.ac.in') && !extractedData) {
+      newErrors.email = "Invalid SIT email format. Please use format: 1si23cs001@sit.ac.in"
+    }
+
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    // Check cooldown
+    if (submitCooldown > 0) {
+      setErrors({ submit: `Please wait ${submitCooldown} seconds before trying again` })
       return
     }
 
-    try {
-      // Attempt to sign up user
-      const result = await signUpUser(formData)
+    if (!validateForm()) return
 
-      if (result.success) {
-        // Success - redirect to dashboard or show success message
-        if (result.data.needsEmailVerification) {
-          onStepChange("otp", {
-            email: formData.email,
-            message: "Please check your email for verification link"
-          })
-        } else {
-          // Redirect to dashboard
-          window.location.href = "/dashboard"
-        }
-      } else {
-        // Handle signup errors
-        if (result.errors) {
-          setErrors(result.errors)
-        } else {
-          setErrors({ general: result.error })
-        }
+    setIsLoading(true)
+    setErrors({})
+
+    try {
+      // Prepare metadata from extracted USN data
+      const metadata = {
+        first_name: formData.firstName.trim(),
+        last_name: formData.lastName.trim(),
+        usn: extractedData?.usn || '',
+        branch: extractedData?.branch || '',
+        joining_year: extractedData?.joiningYear || null,
+        passing_year: extractedData?.passingYear || null,
+        branch_code: extractedData?.branchCode || ''
       }
+
+      console.log('Sending OTP with metadata:', metadata)
+
+      // Check if auth service is ready
+      if (!isReady) {
+        setErrors({ submit: "Authentication service is not available. Please try again." })
+        return
+      }
+
+      // Send OTP using Supabase Auth
+      const { data, error } = await signUpWithOTP(
+        formData.email.trim().toLowerCase(),
+        metadata
+      )
+
+      if (error) {
+        console.error('Signup error:', error)
+        
+        if (error.message?.includes('already registered')) {
+          setErrors({ email: "This email is already registered. Try signing in instead." })
+        } else if (error.message?.includes('rate limit')) {
+          setErrors({ submit: "Too many attempts. Please wait before trying again." })
+          setSubmitCooldown(60)
+        } else {
+          setErrors({ submit: error.message || "Failed to send verification code" })
+        }
+        return
+      }
+
+      console.log('OTP sent successfully:', data)
+
+      // Move to OTP verification step
+      onStepChange('otp-verification', {
+        email: formData.email.trim().toLowerCase(),
+        firstName: formData.firstName.trim(),
+        isSignUp: true,
+        userData: metadata
+      })
+
     } catch (error) {
-      console.error('Signup error:', error)
-      setErrors({ general: 'An unexpected error occurred. Please try again.' })
+      console.error('Unexpected error:', error)
+      setErrors({ submit: "An unexpected error occurred. Please try again." })
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleChange = (e) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({ ...prev, [name]: value }))
-
-    // Clear errors for the field being edited
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: "" }))
-    }
-
-    // Clear general error when user starts typing
-    if (errors.general) {
-      setErrors((prev) => ({ ...prev, general: "" }))
-    }
-  }
-
   return (
-    <Card className="w-full">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl font-bold">Join AlumniVerse</CardTitle>
-        <CardDescription>Create your account to start networking with fellow alumni</CardDescription>
-      </CardHeader>
-      <CardContent>
-        {errors.general && (
-          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-            <p className="text-destructive text-sm">{errors.general}</p>
+    <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center p-4">
+      <Card className="w-full max-w-md bg-[#2D2D2D] border-[#404040] shadow-2xl">
+        <CardHeader className="text-center space-y-4">
+          <div className="mx-auto w-16 h-16 bg-[#4A90E2]/10 rounded-full flex items-center justify-center">
+            <GraduationCap className="w-8 h-8 text-[#4A90E2]" />
           </div>
-        )}
+          <CardTitle className="text-2xl font-bold text-white">
+            Join AlumniVerse
+          </CardTitle>
+          <CardDescription className="text-[#B0B0B0]">
+            Connect with your SIT alumni network
+          </CardDescription>
+        </CardHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-foreground mb-2">
-                First Name *
+        <CardContent className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {/* First Name */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#E0E0E0]">
+                First Name
               </label>
               <Input
-                id="firstName"
-                name="firstName"
                 type="text"
                 value={formData.firstName}
-                onChange={handleChange}
-                placeholder="John"
-                className={errors.firstName ? "border-destructive" : ""}
-                required
+                onChange={(e) => handleInputChange('firstName', e.target.value)}
+                className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2]"
+                placeholder="Enter your first name"
+                disabled={isLoading}
               />
-              {errors.firstName && <p className="text-destructive text-sm mt-1">{errors.firstName}</p>}
+              {errors.firstName && (
+                <p className="text-red-400 text-sm">{errors.firstName}</p>
+              )}
             </div>
 
-            <div>
-              <label htmlFor="lastName" className="block text-sm font-medium text-foreground mb-2">
-                Last Name *
+            {/* Last Name */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#E0E0E0]">
+                Last Name
               </label>
               <Input
-                id="lastName"
-                name="lastName"
                 type="text"
                 value={formData.lastName}
-                onChange={handleChange}
-                placeholder="Doe"
-                className={errors.lastName ? "border-destructive" : ""}
-                required
+                onChange={(e) => handleInputChange('lastName', e.target.value)}
+                className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2]"
+                placeholder="Enter your last name"
+                disabled={isLoading}
               />
-              {errors.lastName && <p className="text-destructive text-sm mt-1">{errors.lastName}</p>}
+              {errors.lastName && (
+                <p className="text-red-400 text-sm">{errors.lastName}</p>
+              )}
             </div>
-          </div>
 
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
-              Institutional Email *
-            </label>
-            <Input
-              id="email"
-              name="email"
-              type="email"
-              value={formData.email}
-              onChange={handleChange}
-              placeholder="1si23is117@sit.ac.in"
-              className={errors.email ? "border-destructive" : ""}
-              required
-            />
-            {errors.email && <p className="text-destructive text-sm mt-1">{errors.email}</p>}
-            <p className="text-foreground-muted text-xs mt-1">Only institutional emails (@sit.ac.in) are accepted</p>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-foreground mb-2">
-                Password *
+            {/* Email */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#E0E0E0]">
+                SIT Email Address
               </label>
               <Input
-                id="password"
-                name="password"
-                type="password"
-                value={formData.password}
-                onChange={handleChange}
-                placeholder="Enter strong password"
-                className={errors.password ? "border-destructive" : ""}
-                required
+                type="email"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2]"
+                placeholder="1si23cs001@sit.ac.in"
+                disabled={isLoading}
               />
-              {errors.password && <p className="text-destructive text-sm mt-1">{errors.password}</p>}
+              {errors.email && (
+                <p className="text-red-400 text-sm">{errors.email}</p>
+              )}
             </div>
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground mb-2">
-                Confirm Password *
-              </label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                placeholder="Confirm password"
-                className={errors.confirmPassword ? "border-destructive" : ""}
-                required
-              />
-              {errors.confirmPassword && <p className="text-destructive text-sm mt-1">{errors.confirmPassword}</p>}
-            </div>
-          </div>
-
-          <div className="text-xs text-foreground-muted space-y-1">
-            <p>Password must contain:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2">
-              <li>At least 8 characters</li>
-              <li>One uppercase letter</li>
-              <li>One lowercase letter</li>
-              <li>One number</li>
-              <li>One special character</li>
-            </ul>
-          </div>
-
-          {/* Auto-extracted student details */}
-          {extractedData && (
-            <div className="bg-success/10 border border-success/20 rounded-md p-4 space-y-3">
-              <h4 className="text-sm font-medium text-success">Auto-extracted Details:</h4>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-foreground-muted">USN:</span>
-                  <span className="ml-2 font-medium">{extractedData.usn}</span>
-                </div>
-                <div>
-                  <span className="text-foreground-muted">Branch:</span>
-                  <span className="ml-2 font-medium">{extractedData.branch}</span>
-                </div>
-                <div>
-                  <span className="text-foreground-muted">Joining Year:</span>
-                  <span className="ml-2 font-medium">{extractedData.joiningYear}</span>
-                </div>
-                <div>
-                  <span className="text-foreground-muted">Passing Year:</span>
-                  <span className="ml-2 font-medium">{extractedData.passingYear}</span>
+            {/* Extracted Data Display */}
+            {extractedData && (
+              <div className="bg-[#4A90E2]/10 border border-[#4A90E2]/30 rounded-lg p-4 space-y-2">
+                <h4 className="text-sm font-medium text-[#4A90E2]">
+                  Detected Information:
+                </h4>
+                <div className="grid grid-cols-2 gap-2 text-sm text-[#E0E0E0]">
+                  <div>USN: <span className="text-[#4A90E2]">{extractedData.usn}</span></div>
+                  <div>Branch: <span className="text-[#4A90E2]">{extractedData.branch}</span></div>
+                  <div>Joining: <span className="text-[#4A90E2]">{extractedData.joiningYear}</span></div>
+                  <div>Passing: <span className="text-[#4A90E2]">{extractedData.passingYear}</span></div>
                 </div>
               </div>
-              <p className="text-xs text-foreground-muted">
-                These details will be automatically saved to your profile.
-              </p>
-            </div>
-          )}
+            )}
 
-          <Button
-            type="submit"
-            className="w-full hover-glow"
-            disabled={isLoading || !extractedData}
-          >
-            {isLoading ? "Creating Account..." : "Create Account"}
-          </Button>
-        </form>
+            {/* Submit Button */}
+            <Button
+              type="submit"
+              disabled={isLoading || submitCooldown > 0}
+              className="w-full h-12 text-base font-semibold bg-[#4A90E2] hover:bg-[#4A90E2]/90 transition-all duration-200"
+            >
+              {isLoading ? (
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Sending verification code...
+                </div>
+              ) : submitCooldown > 0 ? (
+                `Wait ${submitCooldown}s`
+              ) : (
+                "Send Verification Code"
+              )}
+            </Button>
 
-        <div className="mt-6 text-center">
-          <span className="text-foreground-muted text-sm">Already have an account? </span>
-          <button
-            onClick={() => onStepChange("login")}
-            className="text-primary hover:text-primary-hover text-sm font-medium"
-          >
-            Sign in
-          </button>
-        </div>
-      </CardContent>
-    </Card>
+            {/* Error Display */}
+            {errors.submit && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3">
+                <p className="text-red-400 text-sm">{errors.submit}</p>
+              </div>
+            )}
+          </form>
+
+          {/* Sign In Link */}
+          <div className="text-center">
+            <p className="text-[#B0B0B0] text-sm">
+              Already have an account?{" "}
+              <button
+                onClick={() => onStepChange('signin')}
+                className="text-[#4A90E2] hover:underline font-medium"
+                disabled={isLoading}
+              >
+                Sign in
+              </button>
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
   )
 }

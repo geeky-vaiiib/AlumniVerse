@@ -7,21 +7,19 @@ const express = require('express');
 const {
   signup,
   signin,
-  signout,
-  verifyEmail,
-  forgotPassword,
-  resetPassword,
-  refreshToken,
-  getCurrentUser,
+  verifyOTP,
   signupValidation,
   signinValidation,
-  forgotPasswordValidation,
-  resetPasswordValidation
+  verifyOTPValidation
 } = require('../controllers/supabaseAuthController');
 
 const {
   authenticateToken,
   authRateLimit,
+  signupRateLimit,
+  otpRateLimit,
+  signinRateLimit,
+  resendOtpRateLimit,
   validateSITEmail
 } = require('../middlewares/supabaseAuthMiddleware');
 
@@ -32,8 +30,8 @@ const router = express.Router();
  * @desc    Register new user with SIT email
  * @access  Public
  */
-router.post('/signup', 
-  authRateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
+router.post('/signup',
+  signupRateLimit, // 3 attempts per 5 minutes
   validateSITEmail,
   signupValidation,
   signup
@@ -45,60 +43,27 @@ router.post('/signup',
  * @access  Public
  */
 router.post('/signin',
-  authRateLimit(5, 15 * 60 * 1000), // 5 attempts per 15 minutes
+  signinRateLimit, // 10 attempts per 15 minutes
   signinValidation,
   signin
 );
 
 /**
- * @route   POST /api/auth/signout
- * @desc    Sign out user
- * @access  Private
- */
-router.post('/signout', authenticateToken, signout);
-
-/**
- * @route   GET /api/auth/verify-email
- * @desc    Verify email with token
+ * @route   POST /api/auth/verify-otp
+ * @desc    Verify OTP for email verification
  * @access  Public
  */
-router.get('/verify-email', verifyEmail);
-
-/**
- * @route   POST /api/auth/forgot-password
- * @desc    Send password reset email
- * @access  Public
- */
-router.post('/forgot-password',
-  authRateLimit(3, 60 * 60 * 1000), // 3 attempts per hour
-  forgotPasswordValidation,
-  forgotPassword
+router.post('/verify-otp',
+  otpRateLimit, // 5 attempts per 10 minutes
+  verifyOTPValidation,
+  verifyOTP
 );
 
-/**
- * @route   POST /api/auth/reset-password
- * @desc    Reset password with token
- * @access  Public
- */
-router.post('/reset-password',
-  authRateLimit(3, 15 * 60 * 1000), // 3 attempts per 15 minutes
-  resetPasswordValidation,
-  resetPassword
-);
+// Resend OTP is handled by frontend calling signup/signin again
+// Signout is handled by frontend directly with Supabase client
 
-/**
- * @route   POST /api/auth/refresh-token
- * @desc    Refresh access token
- * @access  Public
- */
-router.post('/refresh-token', refreshToken);
-
-/**
- * @route   GET /api/auth/me
- * @desc    Get current user information
- * @access  Private
- */
-router.get('/me', authenticateToken, getCurrentUser);
+// All other auth operations (password reset, refresh token, etc.)
+// are handled directly by Supabase client on frontend
 
 /**
  * @route   GET /api/auth/health

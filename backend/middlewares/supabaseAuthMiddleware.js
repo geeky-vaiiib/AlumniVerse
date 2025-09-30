@@ -5,6 +5,7 @@
 
 const { supabase, supabaseHelpers } = require('../config/supabase');
 const { AppError, catchAsync } = require('./errorMiddleware');
+const rateLimit = require('express-rate-limit');
 
 /**
  * Verify Supabase JWT token and get user
@@ -186,36 +187,73 @@ const requireOwnershipOrAdmin = (resourceUserIdField = 'userId') => {
 };
 
 /**
- * Rate limiting for authentication endpoints
+ * Rate limiting for authentication endpoints using express-rate-limit
  */
+const createAuthRateLimit = (maxAttempts = 5, windowMs = 15 * 60 * 1000, message = 'Too many requests') => {
+  return rateLimit({
+    windowMs: windowMs,
+    max: maxAttempts,
+    message: {
+      success: false,
+      error: {
+        statusCode: 429,
+        status: 'error',
+        isOperational: true
+      },
+      message: message,
+      retryAfter: Math.ceil(windowMs / 1000)
+    },
+    standardHeaders: true,
+    legacyHeaders: false,
+    // Use IP + User-Agent for better identification
+    keyGenerator: (req) => {
+      return req.ip + ':' + (req.get('User-Agent') || 'unknown');
+    },
+    // Custom handler for rate limit exceeded
+    handler: (req, res) => {
+      console.log(`Rate limit exceeded for ${req.ip} on ${req.path}`);
+      res.status(429).json({
+        success: false,
+        error: {
+          statusCode: 429,
+          status: 'error',
+          isOperational: true
+        },
+        message: message,
+        retryAfter: Math.ceil(windowMs / 1000)
+      });
+    }
+  });
+};
+
+// Specific rate limiters for different endpoints
+const signupRateLimit = createAuthRateLimit(
+  3, // 3 attempts
+  5 * 60 * 1000, // per 5 minutes (reduced from 15 minutes)
+  'Too many signup attempts. Please try again in 5 minutes.'
+);
+
+const otpRateLimit = createAuthRateLimit(
+  5, // 5 attempts
+  10 * 60 * 1000, // per 10 minutes
+  'Too many OTP requests. Please try again in 10 minutes.'
+);
+
+const signinRateLimit = createAuthRateLimit(
+  10, // 10 attempts
+  15 * 60 * 1000, // per 15 minutes
+  'Too many login attempts. Please try again in 15 minutes.'
+);
+
+const resendOtpRateLimit = createAuthRateLimit(
+  3, // 3 attempts
+  10 * 60 * 1000, // per 10 minutes
+  'Too many OTP resend requests. Please try again in 10 minutes.'
+);
+
+// Legacy function for backward compatibility
 const authRateLimit = (maxAttempts = 5, windowMs = 15 * 60 * 1000) => {
-  const attempts = new Map();
-
-  return (req, res, next) => {
-    const key = req.ip + req.path;
-    const now = Date.now();
-    
-    // Clean old entries
-    for (const [k, v] of attempts.entries()) {
-      if (now - v.firstAttempt > windowMs) {
-        attempts.delete(k);
-      }
-    }
-
-    const userAttempts = attempts.get(key);
-    
-    if (!userAttempts) {
-      attempts.set(key, { count: 1, firstAttempt: now });
-      return next();
-    }
-
-    if (userAttempts.count >= maxAttempts) {
-      return next(new AppError('Too many authentication attempts. Please try again later.', 429));
-    }
-
-    userAttempts.count++;
-    next();
-  };
+  return createAuthRateLimit(maxAttempts, windowMs);
 };
 
 /**
@@ -262,6 +300,10 @@ module.exports = {
   requireModerator,
   requireOwnershipOrAdmin,
   authRateLimit,
+  signupRateLimit,
+  otpRateLimit,
+  signinRateLimit,
+  resendOtpRateLimit,
   validateSITEmail,
   setSupabaseSession
 };

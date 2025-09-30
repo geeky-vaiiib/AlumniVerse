@@ -34,7 +34,12 @@ CREATE TABLE users (
     social_links JSONB DEFAULT '{}'::jsonb,
     career_preferences JSONB DEFAULT '{}'::jsonb,
     resume_path TEXT,
+    resume_url TEXT, -- Enhanced: Direct URL for resume access
     avatar_path TEXT,
+    -- Enhanced Profile Fields
+    linkedin_url TEXT,
+    github_url TEXT,
+    leetcode_url TEXT,
     is_email_verified BOOLEAN DEFAULT false,
     is_profile_complete BOOLEAN DEFAULT false,
     role VARCHAR(20) DEFAULT 'user' CHECK (role IN ('user', 'admin', 'moderator')),

@@ -17,7 +17,7 @@ export async function middleware(request) {
   const url = request.nextUrl.clone()
   
   // Define protected routes
-  const protectedRoutes = ['/jobs', '/directory', '/events', '/dashboard', '/badges']
+  const protectedRoutes = ['/jobs', '/directory', '/events', '/dashboard', '/badges', '/profile']
   const authRoutes = ['/auth']
   
   const isProtectedRoute = protectedRoutes.some(route => 
@@ -27,8 +27,11 @@ export async function middleware(request) {
     url.pathname.startsWith(route)
   )
 
+  // Check for dummy authentication bypass
+  const isDummyAuth = request.cookies.get('dummy-auth-verified')?.value === 'true'
+
   // If user is not authenticated and trying to access protected route
-  if (isProtectedRoute && !session) {
+  if (isProtectedRoute && !session && !isDummyAuth) {
     const redirectUrl = new URL('/auth', request.url)
     redirectUrl.searchParams.set('redirectTo', url.pathname)
     return NextResponse.redirect(redirectUrl)
