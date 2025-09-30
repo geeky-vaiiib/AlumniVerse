@@ -38,93 +38,42 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Desktop Navigation */}
+          {/* Desktop Navigation - Center */}
           <div className="hidden md:block">
             <div className="ml-10 flex items-baseline space-x-8">
-              {!user && (
-                <button
-                  onClick={() => scrollToSection('features')}
-                  className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer relative group"
-                >
-                  Features
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-                </button>
-              )}
-              {user && (
-                <>
-                  <a
-                    href="/directory"
-                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Directory
-                  </a>
-                  <a
-                    href="/jobs"
-                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Jobs
-                  </a>
-                  <a
-                    href="/events"
-                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Events
-                  </a>
-                  <a
-                    href="/dashboard"
-                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors"
-                  >
-                    Dashboard
-                  </a>
-                </>
-              )}
-              {!user && (
-                <>
-                  <button
-                    onClick={() => scrollToSection('about')}
-                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer relative group"
-                  >
-                  About
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-                  </button>
-                  <button
-                    onClick={() => scrollToSection('footer')}
-                    className="text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer relative group"
-                  >
-                  Contact
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-                  </button>
-                </>
-              )}
+              <button
+                onClick={() => scrollToSection('features')}
+                className="relative group text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
+              >
+                Features
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+              </button>
+              <button
+                onClick={() => scrollToSection('about')}
+                className="relative group text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
+              >
+                About
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+              </button>
+              <button
+                onClick={() => scrollToSection('footer')}
+                className="relative group text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
+              >
+                Contact
+                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+              </button>
             </div>
           </div>
 
-          {/* CTA Buttons */}
+          {/* Right Side - Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            {!user && !loading && (
-              <>
-                <button className="text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors relative group">
-                  <a href="/auth">Login</a>
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-                </button>
-                <button className="bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors hover-glow">
-                  <a href="/auth?mode=signup">Get Started</a>
-                </button>
-              </>
-            )}
-            {user && (
-              <div className="flex items-center space-x-4">
-                <span className="text-foreground-muted text-sm">
-                  Welcome, {user.email?.split('@')[0]}
-                </span>
-                <button
-                  onClick={handleSignOut}
-                  className="text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors"
-                >
-                  Sign Out
-                </button>
-              </div>
-            )}
+            <button className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+              <a href="/auth">Login</a>
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+            </button>
+            <button className="bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors hover-glow">
+              <a href="/auth?mode=signup">Get Started</a>
+            </button>
           </div>
 
           {/* Mobile menu button */}
@@ -146,46 +95,28 @@ export default function Navbar() {
             <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-border-subtle">
               <button
                 onClick={() => scrollToSection('features')}
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left relative group"
+                className="relative group text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left"
               >
                 Features
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
               </button>
-              <a
-                href="/directory"
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium"
-              >
-                Directory
-              </a>
-              <a
-                href="/jobs"
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium"
-              >
-                Jobs
-              </a>
-              <a
-                href="/dashboard"
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium"
-              >
-                Dashboard
-              </a>
               <button
                 onClick={() => scrollToSection('about')}
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left relative group"
+                className="relative group text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left"
               >
                 About
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
               </button>
               <button
                 onClick={() => scrollToSection('footer')}
-                className="text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left relative group"
+                className="relative group text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left"
               >
                 Contact
                 <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
               </button>
               <div className="pt-4 pb-3 border-t border-border-subtle">
                 <div className="flex items-center space-x-3">
-                  <button className="w-full text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors relative group">
+                  <button className="relative group w-full text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
                     <a href="/auth">Login</a>
                     <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
                   </button>
