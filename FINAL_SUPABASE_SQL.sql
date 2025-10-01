@@ -1,7 +1,8 @@
 -- ============================================================================
--- ALUMNIVERSE DATABASE SCHEMA
--- Run this SQL in your Supabase SQL Editor to create all required tables
+-- ALUMNIVERSE DATABASE SCHEMA - FINAL VERSION
+-- Run this COMPLETE SQL in your Supabase SQL Editor to create all tables
 -- Go to: https://supabase.com/dashboard → SQL Editor → New Query
+-- This version fixes ALL column name issues and is ready to run!
 -- ============================================================================
 
 -- Posts Table
@@ -58,7 +59,7 @@ CREATE TABLE IF NOT EXISTS public.jobs (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Events Table
+-- Events Table (using event_date and organized_by to match existing schema)
 CREATE TABLE IF NOT EXISTS public.events (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   title VARCHAR(255) NOT NULL,
@@ -173,3 +174,18 @@ CREATE POLICY "Users can register for events" ON public.event_registrations
 
 CREATE POLICY "Users can unregister from events" ON public.event_registrations
   FOR DELETE USING (user_id IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
+
+-- ============================================================================
+-- SUCCESS MESSAGE
+-- ============================================================================
+-- If this SQL runs without errors, you're all set!
+-- Your AlumniVerse database now has all required tables for:
+-- ✅ Posts with likes and comments
+-- ✅ Jobs with applications  
+-- ✅ Events with registrations
+-- ✅ Row Level Security policies
+-- ✅ Performance indexes
+--
+-- Next step: Restart your backend server
+-- cd /Users/vaibhavjp/Desktop/AlumniVerse/backend && node server.js
+-- ============================================================================
