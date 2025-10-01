@@ -4,36 +4,64 @@
 -- Copy this ENTIRE SQL and run in Supabase SQL Editor
 -- ============================================================================
 
--- STEP 1: Clean slate - Drop everything that might conflict
-DROP POLICY IF EXISTS "Posts are viewable by everyone" ON public.posts CASCADE;
-DROP POLICY IF EXISTS "Users can create posts" ON public.posts CASCADE;
-DROP POLICY IF EXISTS "Users can update own posts" ON public.posts CASCADE;
-DROP POLICY IF EXISTS "Users can delete own posts" ON public.posts CASCADE;
-DROP POLICY IF EXISTS "Post likes are viewable by everyone" ON public.post_likes CASCADE;
-DROP POLICY IF EXISTS "Users can like posts" ON public.post_likes CASCADE;
-DROP POLICY IF EXISTS "Users can unlike posts" ON public.post_likes CASCADE;
-DROP POLICY IF EXISTS "Comments are viewable by everyone" ON public.comments CASCADE;
-DROP POLICY IF EXISTS "Users can create comments" ON public.comments CASCADE;
-DROP POLICY IF EXISTS "Users can update own comments" ON public.comments CASCADE;
-DROP POLICY IF EXISTS "Users can delete own comments" ON public.comments CASCADE;
-DROP POLICY IF EXISTS "Jobs are viewable by everyone" ON public.jobs CASCADE;
-DROP POLICY IF EXISTS "Users can create jobs" ON public.jobs CASCADE;
-DROP POLICY IF EXISTS "Users can update own jobs" ON public.jobs CASCADE;
-DROP POLICY IF EXISTS "Users can delete own jobs" ON public.jobs CASCADE;
-DROP POLICY IF EXISTS "Events are viewable by everyone" ON public.events CASCADE;
-DROP POLICY IF EXISTS "Users can create events" ON public.events CASCADE;
-DROP POLICY IF EXISTS "Users can update own events" ON public.events CASCADE;
-DROP POLICY IF EXISTS "Users can delete own events" ON public.events CASCADE;
-DROP POLICY IF EXISTS "Event registrations are viewable by everyone" ON public.event_registrations CASCADE;
-DROP POLICY IF EXISTS "Users can register for events" ON public.event_registrations CASCADE;
-DROP POLICY IF EXISTS "Users can unregister from events" ON public.event_registrations CASCADE;
-
-DROP TABLE IF EXISTS public.event_registrations CASCADE;
-DROP TABLE IF EXISTS public.comments CASCADE;
-DROP TABLE IF EXISTS public.post_likes CASCADE;
-DROP TABLE IF EXISTS public.posts CASCADE;
-DROP TABLE IF EXISTS public.jobs CASCADE;
-DROP TABLE IF EXISTS public.events CASCADE;
+-- STEP 1: Clean slate - Drop everything safely with proper error handling
+DO $$ 
+BEGIN
+    -- Drop policies if they exist (ignore errors if tables don't exist)
+    BEGIN
+        DROP POLICY IF EXISTS "Posts are viewable by everyone" ON public.posts;
+        DROP POLICY IF EXISTS "Users can create posts" ON public.posts;
+        DROP POLICY IF EXISTS "Users can update own posts" ON public.posts;
+        DROP POLICY IF EXISTS "Users can delete own posts" ON public.posts;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    
+    BEGIN
+        DROP POLICY IF EXISTS "Post likes are viewable by everyone" ON public.post_likes;
+        DROP POLICY IF EXISTS "Users can like posts" ON public.post_likes;
+        DROP POLICY IF EXISTS "Users can unlike posts" ON public.post_likes;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    
+    BEGIN
+        DROP POLICY IF EXISTS "Comments are viewable by everyone" ON public.comments;
+        DROP POLICY IF EXISTS "Users can create comments" ON public.comments;
+        DROP POLICY IF EXISTS "Users can update own comments" ON public.comments;
+        DROP POLICY IF EXISTS "Users can delete own comments" ON public.comments;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    
+    BEGIN
+        DROP POLICY IF EXISTS "Jobs are viewable by everyone" ON public.jobs;
+        DROP POLICY IF EXISTS "Users can create jobs" ON public.jobs;
+        DROP POLICY IF EXISTS "Users can update own jobs" ON public.jobs;
+        DROP POLICY IF EXISTS "Users can delete own jobs" ON public.jobs;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    
+    BEGIN
+        DROP POLICY IF EXISTS "Events are viewable by everyone" ON public.events;
+        DROP POLICY IF EXISTS "Users can create events" ON public.events;
+        DROP POLICY IF EXISTS "Users can update own events" ON public.events;
+        DROP POLICY IF EXISTS "Users can delete own events" ON public.events;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    
+    BEGIN
+        DROP POLICY IF EXISTS "Event registrations are viewable by everyone" ON public.event_registrations;
+        DROP POLICY IF EXISTS "Users can register for events" ON public.event_registrations;
+        DROP POLICY IF EXISTS "Users can unregister from events" ON public.event_registrations;
+    EXCEPTION WHEN OTHERS THEN NULL;
+    END;
+    
+    -- Drop tables in dependency order (child tables first)
+    DROP TABLE IF EXISTS public.event_registrations CASCADE;
+    DROP TABLE IF EXISTS public.comments CASCADE;
+    DROP TABLE IF EXISTS public.post_likes CASCADE;
+    DROP TABLE IF EXISTS public.posts CASCADE;
+    DROP TABLE IF EXISTS public.jobs CASCADE;
+    DROP TABLE IF EXISTS public.events CASCADE;
+END $$;
 
 -- STEP 2: Create tables one by one
 CREATE TABLE public.posts (
