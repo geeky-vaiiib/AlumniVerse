@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.events (
   max_attendees INTEGER,
   attendees_count INTEGER DEFAULT 0,
   category VARCHAR(50),
-  organizer_id UUID REFERENCES public.users(id) ON DELETE SET NULL,
+  organized_by UUID REFERENCES public.users(id) ON DELETE SET NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -90,7 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_post_likes_post ON public.post_likes(post_id);
 CREATE INDEX IF NOT EXISTS idx_post_likes_user ON public.post_likes(user_id);
 CREATE INDEX IF NOT EXISTS idx_comments_post ON public.comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_jobs_posted_by ON public.jobs(posted_by);
-CREATE INDEX IF NOT EXISTS idx_events_organizer ON public.events(organizer_id) WHERE organizer_id IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_events_organizer ON public.events(organized_by) WHERE organized_by IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_events_date ON public.events(date DESC);
 
 -- Enable Row Level Security
@@ -158,10 +158,10 @@ CREATE POLICY "Users can create events" ON public.events
   FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
 
 CREATE POLICY "Users can update own events" ON public.events
-  FOR UPDATE USING (organizer_id IS NULL OR organizer_id IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
+  FOR UPDATE USING (organized_by IS NULL OR organized_by IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
 
 CREATE POLICY "Users can delete own events" ON public.events
-  FOR DELETE USING (organizer_id IS NULL OR organizer_id IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
+  FOR DELETE USING (organized_by IS NULL OR organized_by IN (SELECT id FROM public.users WHERE auth_id = auth.uid()));
 
 -- RLS Policies for Event Registrations
 CREATE POLICY "Event registrations are viewable by everyone" ON public.event_registrations
