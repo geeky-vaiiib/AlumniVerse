@@ -1,27 +1,54 @@
 # 🎓 AlumniVerse
 
-> **A comprehensive alumni networking platform built with Next.js and Supabase**
+> **A modern, dynamic alumni networking platform with real-time interactions**
 
-[![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js)](https://nextjs.org/)
-[![Supabase](https://img.shields.io/badge/Supabase-Database-green?logo=supabase)](https://supabase.com/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS](https://img.shields.io/badge/Tailwind-CSS-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
+[![Next.js](https://img.shields.io/badge/Next.js-14.2.16-black?logo=next.js)](https://nextjs.org/)
+[![React](https://img.shields.io/badge/React-18-blue?logo=react)](https://reactjs.org/)
+[![Supabase](https://img.shields.io/badge/Supabase-Latest-green?logo=supabase)](https://supabase.com/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?logo=tailwind-css)](https://tailwindcss.com/)
 [![Production Ready](https://img.shields.io/badge/Status-Production%20Ready-success)](https://github.com/geeky-vaiiib/AlumniVerse)
 
 ## 🌟 Overview
 
-AlumniVerse is a modern, full-stack alumni networking platform designed specifically for educational institutions. It provides a secure, feature-rich environment for alumni to connect, share opportunities, and maintain lifelong professional relationships.
+AlumniVerse is a **fully dynamic, database-driven** alumni networking platform designed for SIT (Siddaganga Institute of Technology). It provides a secure, feature-rich environment for alumni to connect, share opportunities, create content, and maintain lifelong professional relationships.
 
 ### ✨ Key Features
 
-- 🔐 **Secure Authentication** - Institutional email validation with automatic profile creation
-- 🎯 **Smart USN Parsing** - Automatic extraction of academic details from email addresses
-- 👥 **Alumni Directory** - Comprehensive searchable directory with advanced filters
-- 💼 **Job Board** - Exclusive job postings and internship opportunities
-- 📅 **Events Management** - Alumni reunions, networking events, and workshops
-- 🏆 **Recognition System** - Badges and achievements for active community members
-- 📱 **Responsive Design** - Seamless experience across all devices
-- 🛡️ **Enterprise Security** - Rate limiting, CORS protection, and data encryption
+#### **🔐 Authentication & Profiles**
+- Secure email/password authentication via Supabase
+- OTP verification for email confirmation
+- SIT email domain validation (`@sit.ac.in`)
+- Automatic USN, branch, and year extraction from email
+- Personalized user profiles with real data
+- Social media integration (LinkedIn, GitHub, LeetCode)
+
+#### **📝 Dynamic Posts & News Feed**
+- Create posts with text, images, links, and hashtags
+- Like and unlike posts in real-time
+- Comment on posts with threaded discussions
+- User-specific like tracking
+- Automatic count updates via database triggers
+
+#### **💼 Dynamic Job Board**
+- Post job opportunities with full details
+- Bookmark jobs for later viewing
+- Filter by type, experience level, location
+- Application tracking with URLs
+- User-specific bookmark management
+
+#### **📅 Dynamic Events System**
+- Create and organize events
+- RSVP/register for events
+- Track attendance and registrations
+- Support for virtual events with meeting links
+- Real-time attendee counts
+
+#### **📊 Real-Time Platform Statistics**
+- Live alumni count from database
+- Active users percentage
+- New connections tracking
+- Upcoming events count
+- Dynamic updates (no mock data)
 
 ## 🏗️ Architecture
 

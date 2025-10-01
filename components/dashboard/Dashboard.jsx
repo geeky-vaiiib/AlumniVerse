@@ -24,28 +24,13 @@ export default function Dashboard() {
               <p className="text-foreground-muted">Welcome back to your alumni network</p>
             </div>
             <div className="flex items-center space-x-4">
-              <button className="relative p-2 text-foreground-muted hover:text-foreground transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-5 5v-5zM9 7H4l5-5v5z"
-                  />
+              {/* AlumniVerse Logo/Branding */}
+              <div className="flex items-center space-x-2 text-primary">
+                <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2L13.5 8.5L20 7L14.5 12L21 17L13.5 15.5L12 22L10.5 15.5L4 17L9.5 12L3 7L10.5 8.5L12 2Z"/>
                 </svg>
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full"></span>
-              </button>
-              <button className="relative p-2 text-foreground-muted hover:text-foreground transition-colors">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M15 17h5l-5 5v-5zM9 7H4l5-5v5z"
-                  />
-                </svg>
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-destructive rounded-full"></span>
-              </button>
+                <span className="text-lg font-bold hidden sm:block">AlumniVerse</span>
+              </div>
             </div>
           </div>
         </div>

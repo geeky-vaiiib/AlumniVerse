@@ -13,7 +13,7 @@ const {
   jobQueryValidation,
   applicationStatusValidation
 } = require('../controllers/jobsController');
-const { authenticateToken, optionalAuth } = require('../middlewares/authMiddleware');
+const { authenticateToken, optionalAuth } = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
 

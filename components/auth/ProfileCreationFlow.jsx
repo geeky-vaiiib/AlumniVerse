@@ -58,13 +58,17 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
     if (userData?.email || user?.email) {
       const email = userData?.email || user?.email
       const parsedData = parseInstitutionalEmail(email)
-      
+
+      // Get names from userData or nested userData.userData (from signup metadata)
+      const firstName = userData?.firstName || userData?.userData?.first_name || ''
+      const lastName = userData?.lastName || userData?.userData?.last_name || ''
+
       if (parsedData.isValid) {
         setFormData(prev => ({
           ...prev,
           email: email,
-          firstName: userData?.firstName || '',
-          lastName: userData?.lastName || '',
+          firstName: firstName,
+          lastName: lastName,
           branch: parsedData.branch,
           joiningYear: parsedData.joiningYear,
           passingYear: parsedData.passingYear,
@@ -74,8 +78,8 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
         setFormData(prev => ({
           ...prev,
           email: email,
-          firstName: userData?.firstName || '',
-          lastName: userData?.lastName || ''
+          firstName: firstName,
+          lastName: lastName
         }))
       }
     }
@@ -256,41 +260,53 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="branch" className="text-white">Branch *</Label>
+                  <Label htmlFor="branch" className="text-white">
+                    Branch * <span className="text-xs text-[#B0B0B0]">(Auto-extracted from email)</span>
+                  </Label>
                   <Input
                     id="branch"
                     value={formData.branch}
                     onChange={(e) => handleInputChange('branch', e.target.value)}
-                    className="bg-[#3D3D3D] border-[#4D4D4D] text-white"
+                    className="bg-[#2D2D2D] border-[#4D4D4D] text-white cursor-not-allowed opacity-75"
                     placeholder="Computer Science"
+                    disabled
+                    readOnly
                   />
                   {errors.branch && <p className="text-red-400 text-sm mt-1">{errors.branch}</p>}
                 </div>
 
                 <div>
-                  <Label htmlFor="passingYear" className="text-white">Passing Year *</Label>
+                  <Label htmlFor="passingYear" className="text-white">
+                    Passing Year * <span className="text-xs text-[#B0B0B0]">(Auto-extracted from email)</span>
+                  </Label>
                   <Input
                     id="passingYear"
                     type="number"
                     value={formData.passingYear}
                     onChange={(e) => handleInputChange('passingYear', parseInt(e.target.value))}
-                    className="bg-[#3D3D3D] border-[#4D4D4D] text-white"
+                    className="bg-[#2D2D2D] border-[#4D4D4D] text-white cursor-not-allowed opacity-75"
                     placeholder="2024"
                     min="2000"
                     max="2030"
+                    disabled
+                    readOnly
                   />
                   {errors.passingYear && <p className="text-red-400 text-sm mt-1">{errors.passingYear}</p>}
                 </div>
               </div>
 
               <div>
-                <Label htmlFor="usn" className="text-white">USN</Label>
+                <Label htmlFor="usn" className="text-white">
+                  USN <span className="text-xs text-[#B0B0B0]">(Auto-extracted from email)</span>
+                </Label>
                 <Input
                   id="usn"
                   value={formData.usn}
                   onChange={(e) => handleInputChange('usn', e.target.value.toUpperCase())}
-                  className="bg-[#3D3D3D] border-[#4D4D4D] text-white"
+                  className="bg-[#2D2D2D] border-[#4D4D4D] text-white cursor-not-allowed opacity-75"
                   placeholder="1SI23IS117"
+                  disabled
+                  readOnly
                 />
               </div>
             </div>

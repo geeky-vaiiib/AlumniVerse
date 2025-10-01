@@ -95,6 +95,9 @@ export default function LoginForm({ onStepChange }) {
 
       console.log('Login OTP sent successfully:', data)
 
+      // Store email for OTP verification
+      sessionStorage.setItem('pendingVerificationEmail', email.trim().toLowerCase())
+
       // Move to OTP verification step
       onStepChange('otp-verification', {
         email: email.trim().toLowerCase(),
@@ -110,8 +113,8 @@ export default function LoginForm({ onStepChange }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-[#2D2D2D] border-[#404040] shadow-2xl">
+    <div className="flex items-center justify-center p-4 py-12">
+      <Card className="w-full max-w-md bg-surface border-border shadow-2xl">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-[#4A90E2]/10 rounded-full flex items-center justify-center">
             <GraduationCap className="w-8 h-8 text-[#4A90E2]" />

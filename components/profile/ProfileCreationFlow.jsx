@@ -35,12 +35,12 @@ const STEPS = [
     title: "Professional",
     description: "Career & resume",
     icon: Briefcase,
-    fields: ['currentCompany', 'designation', 'location', 'resume']
+    fields: ['currentCompany', 'designation', 'location', 'resumeUrl']
   },
   {
     id: 3,
     title: "Social Links",
-    description: "Connect your profiles",
+    description: "Connect your profiles (Required)",
     icon: Code,
     fields: ['linkedinUrl', 'githubUrl', 'leetcodeUrl']
   }
@@ -60,11 +60,17 @@ const BRANCH_OPTIONS = [
 
 export default function ProfileCreationFlow({ userData, onComplete }) {
   const [currentStep, setCurrentStep] = useState(1)
+  
+  // Extract data from userData (from email parsing)
+  const extractedData = userData?.userData || {}
+  
   const [formData, setFormData] = useState({
-    firstName: userData?.firstName || '',
-    lastName: userData?.lastName || '',
-    branch: userData?.branch || '',
-    yearOfPassing: userData?.passingYear || '',
+    firstName: userData?.firstName || extractedData?.first_name || '',
+    lastName: userData?.lastName || extractedData?.last_name || '',
+    branch: extractedData?.branch || '',
+    yearOfPassing: extractedData?.passing_year || '',
+    usn: extractedData?.usn || '',
+    joiningYear: extractedData?.joining_year || '',
     currentCompany: '',
     designation: '',
     location: '',
@@ -142,18 +148,29 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
           break
         }
         case 'linkedinUrl':
-          if (value && !urlPatterns.linkedin.test(value)) {
+          if (!value || !value.trim()) {
+            newErrors[field] = 'LinkedIn profile URL is required'
+          } else if (!urlPatterns.linkedin.test(value)) {
             newErrors[field] = 'Please enter a valid LinkedIn URL'
           }
           break
         case 'githubUrl':
-          if (value && !urlPatterns.github.test(value)) {
+          if (!value || !value.trim()) {
+            newErrors[field] = 'GitHub profile URL is required'
+          } else if (!urlPatterns.github.test(value)) {
             newErrors[field] = 'Please enter a valid GitHub URL'
           }
           break
         case 'leetcodeUrl':
-          if (value && !urlPatterns.leetcode.test(value)) {
+          if (!value || !value.trim()) {
+            newErrors[field] = 'LeetCode profile URL is required'
+          } else if (!urlPatterns.leetcode.test(value)) {
             newErrors[field] = 'Please enter a valid LeetCode URL'
+          }
+          break
+        case 'resumeUrl':
+          if (!value || !value.trim()) {
+            newErrors[field] = 'Resume URL is required'
           }
           break
       }
@@ -266,42 +283,91 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/profile/update', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          branch: formData.branch,
-          yearOfPassing: parseInt(formData.yearOfPassing),
-          currentCompany: formData.currentCompany,
-          designation: formData.designation,
-          location: formData.location,
-          linkedinUrl: formData.linkedinUrl,
-          githubUrl: formData.githubUrl,
-          leetcodeUrl: formData.leetcodeUrl,
-          resumeUrl: formData.resumeUrl
-        })
+      // Import supabase client
+      const { createClient } = await import('@supabase/supabase-js')
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+      )
+
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      
+      if (userError || !user) {
+        setErrors({ submit: 'Authentication error. Please log in again.' })
+        return
+      }
+
+      // Prepare profile data
+      const profileData = {
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        usn: formData.usn || userData?.userData?.usn || '',
+        branch: formData.branch,
+        joining_year: formData.joiningYear || userData?.userData?.joining_year || null,
+        passing_year: parseInt(formData.yearOfPassing),
+        branch_code: userData?.userData?.branch_code || '',
+        currentCompany: formData.currentCompany,
+        designation: formData.designation,
+        location: formData.location,
+        linkedinUrl: formData.linkedinUrl,
+        githubUrl: formData.githubUrl,
+        leetcodeUrl: formData.leetcodeUrl,
+        resumeUrl: formData.resumeUrl,
+        profileCompleted: true,
+        profileCompletion: 100
+      }
+
+      // Update user metadata with profile data
+      const { data, error } = await supabase.auth.updateUser({
+        data: profileData
       })
 
-      const result = await response.json()
+      if (error) {
+        console.error('Profile update error:', error)
+        setErrors({ submit: error.message || 'Failed to update profile' })
+        return
+      }
 
-      if (response.ok && result.success) {
-        // Clear draft from localStorage
-        localStorage.removeItem('profileCreationDraft')
-        
-        // Call completion handler
-        if (onComplete) {
-          onComplete(result.data.user)
-        } else {
-          // Fallback redirect
-          window.location.href = '/dashboard'
-        }
+      // Also save to users table in database
+      const { error: dbError } = await supabase
+        .from('users')
+        .upsert({
+          auth_id: user.id,
+          email: user.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          usn: formData.usn || userData?.userData?.usn || '',
+          branch: formData.branch,
+          admission_year: formData.joiningYear || userData?.userData?.joining_year || null,
+          passing_year: parseInt(formData.yearOfPassing),
+          company: formData.currentCompany,
+          current_position: formData.designation,
+          location: formData.location,
+          linkedin_url: formData.linkedinUrl,
+          github_url: formData.githubUrl,
+          leetcode_url: formData.leetcodeUrl,
+          resume_url: formData.resumeUrl,
+          is_profile_complete: true,
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'auth_id'
+        })
+
+      if (dbError) {
+        console.error('Database profile save error:', dbError)
+        // Don't fail the whole process if DB save fails
+      }
+
+      // Clear draft from localStorage
+      localStorage.removeItem('profileCreationDraft')
+      
+      // Call completion handler with updated user data
+      if (onComplete) {
+        onComplete(data.user)
       } else {
-        setErrors({ submit: result.message || 'Failed to update profile' })
+        // Fallback redirect
+        window.location.href = '/dashboard'
       }
     } catch (error) {
       console.error('Profile update error:', error)
@@ -372,77 +438,52 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName" className="text-white">First Name *</Label>
+                  <Label htmlFor="firstName" className="text-white">First Name * (from email)</Label>
                   <Input
                     id="firstName"
                     value={formData.firstName}
-                    onChange={(e) => handleChange('firstName', e.target.value)}
-                    placeholder="Enter your first name"
-                    className={`bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] ${
-                      errors.firstName ? 'border-red-500' : ''
-                    }`}
+                    readOnly
+                    disabled
+                    className="bg-[#2D2D2D] border-[#606060] text-[#B0B0B0] cursor-not-allowed"
                   />
-                  {errors.firstName && (
-                    <p className="text-red-400 text-sm">{errors.firstName}</p>
-                  )}
+                  <p className="text-xs text-[#B0B0B0]">Extracted from your SIT email</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="lastName" className="text-white">Last Name *</Label>
+                  <Label htmlFor="lastName" className="text-white">Last Name * (from email)</Label>
                   <Input
                     id="lastName"
                     value={formData.lastName}
-                    onChange={(e) => handleChange('lastName', e.target.value)}
-                    placeholder="Enter your last name"
-                    className={`bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] ${
-                      errors.lastName ? 'border-red-500' : ''
-                    }`}
+                    readOnly
+                    disabled
+                    className="bg-[#2D2D2D] border-[#606060] text-[#B0B0B0] cursor-not-allowed"
                   />
-                  {errors.lastName && (
-                    <p className="text-red-400 text-sm">{errors.lastName}</p>
-                  )}
+                  <p className="text-xs text-[#B0B0B0]">Extracted from your SIT email</p>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="branch" className="text-white">Branch *</Label>
-                <select
+                <Label htmlFor="branch" className="text-white">Branch * (from email)</Label>
+                <Input
                   id="branch"
                   value={formData.branch}
-                  onChange={(e) => handleChange('branch', e.target.value)}
-                  className={`w-full h-10 px-3 py-2 text-sm bg-[#404040] border border-[#606060] text-white rounded-md focus:outline-none focus:ring-2 focus:ring-[#4A90E2] focus:border-[#4A90E2] ${
-                    errors.branch ? 'border-red-500' : ''
-                  }`}
-                >
-                  <option value="" className="bg-[#404040]">Select your branch</option>
-                  {BRANCH_OPTIONS.map(option => (
-                    <option key={option.value} value={option.value} className="bg-[#404040]">
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-                {errors.branch && (
-                  <p className="text-red-400 text-sm">{errors.branch}</p>
-                )}
+                  readOnly
+                  disabled
+                  className="bg-[#2D2D2D] border-[#606060] text-[#B0B0B0] cursor-not-allowed"
+                />
+                <p className="text-xs text-[#B0B0B0]">Extracted from your USN</p>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="yearOfPassing" className="text-white">Year of Passing *</Label>
+                <Label htmlFor="yearOfPassing" className="text-white">Year of Passing * (from email)</Label>
                 <Input
                   id="yearOfPassing"
-                  type="number"
-                  min="2010"
-                  max="2030"
                   value={formData.yearOfPassing}
-                  onChange={(e) => handleChange('yearOfPassing', e.target.value)}
-                  placeholder="e.g., 2024"
-                  className={`bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] ${
-                    errors.yearOfPassing ? 'border-red-500' : ''
-                  }`}
+                  readOnly
+                  disabled
+                  className="bg-[#2D2D2D] border-[#606060] text-[#B0B0B0] cursor-not-allowed"
                 />
-                {errors.yearOfPassing && (
-                  <p className="text-red-400 text-sm">{errors.yearOfPassing}</p>
-                )}
+                <p className="text-xs text-[#B0B0B0]">Extracted from your USN</p>
               </div>
             </div>
           )}

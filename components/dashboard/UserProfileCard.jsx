@@ -1,18 +1,19 @@
 "use client"
 
 import { useState } from 'react'
+import { useUser } from '../../contexts/UserContext'
 import { Card, CardContent, CardHeader } from "../ui/card"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
-import { 
-  User, 
-  MapPin, 
-  Calendar, 
-  Briefcase, 
-  ExternalLink, 
-  Github, 
-  Linkedin, 
+import {
+  User,
+  MapPin,
+  Calendar,
+  Briefcase,
+  ExternalLink,
+  Github,
+  Linkedin,
   Code,
   Edit,
   Award,
@@ -20,34 +21,53 @@ import {
   TrendingUp
 } from "lucide-react"
 
-export default function UserProfileCard({ user }) {
+export default function UserProfileCard() {
   const [isExpanded, setIsExpanded] = useState(false)
+  const { userProfile, loading, getFullName, getInitials } = useUser()
 
-  // Mock user data - in real app this would come from user prop or API
+  // Show loading state
+  if (loading) {
+    return (
+      <Card className="bg-[#2D2D2D] border-[#3D3D3D] overflow-hidden">
+        <CardContent className="p-6">
+          <div className="animate-pulse space-y-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-16 h-16 bg-[#3D3D3D] rounded-full"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-[#3D3D3D] rounded w-3/4"></div>
+                <div className="h-3 bg-[#3D3D3D] rounded w-1/2"></div>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  // Use real user data from context
   const userData = {
-    name: user?.email ? user.email.split('@')[0] : 'User',
-    email: user?.email || 'user@sit.ac.in',
-    avatar: null,
-    branch: 'Computer Science',
-    graduationYear: '2024',
-    currentCompany: 'Tech Corp',
-    designation: 'Software Engineer',
-    location: 'Bangalore, India',
-    connections: 156,
-    profileViews: 89,
-    profileCompletion: 85,
-    linkedinUrl: 'https://linkedin.com/in/user',
-    githubUrl: 'https://github.com/user',
-    leetcodeUrl: 'https://leetcode.com/user',
-    resumeUrl: '/resume.pdf',
-    badges: ['Early Adopter', 'Active Contributor'],
-    skills: ['React', 'Node.js', 'Python', 'AWS'],
-    bio: 'Passionate software engineer with expertise in full-stack development.'
+    name: getFullName(),
+    email: userProfile?.email || 'user@sit.ac.in',
+    avatar: userProfile?.avatarUrl || null,
+    branch: userProfile?.branch || 'Not specified',
+    graduationYear: userProfile?.passingYear || 'N/A',
+    currentCompany: userProfile?.currentCompany || 'Not specified',
+    designation: userProfile?.designation || 'Not specified',
+    location: userProfile?.location || 'Not specified',
+    connections: userProfile?.connections || 0,
+    profileViews: userProfile?.profileViews || 0,
+    profileCompletion: userProfile?.profileCompletion || 50,
+    linkedinUrl: userProfile?.linkedinUrl || '',
+    githubUrl: userProfile?.githubUrl || '',
+    leetcodeUrl: userProfile?.leetcodeUrl || '',
+    resumeUrl: userProfile?.resumeUrl || '',
+    badges: userProfile?.badges || [],
+    skills: userProfile?.skills || [],
+    bio: userProfile?.bio || '',
+    usn: userProfile?.usn || ''
   }
 
-  const getInitials = (name) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase()
-  }
+
 
   const getProfileCompletionColor = (percentage) => {
     if (percentage >= 80) return 'text-green-400'
@@ -63,7 +83,7 @@ export default function UserProfileCard({ user }) {
             <Avatar className="w-16 h-16 border-2 border-[#4A90E2]">
               <AvatarImage src={userData.avatar} alt={userData.name} />
               <AvatarFallback className="bg-[#4A90E2] text-white font-semibold">
-                {getInitials(userData.name)}
+                {getInitials()}
               </AvatarFallback>
             </Avatar>
             <div>
@@ -126,18 +146,26 @@ export default function UserProfileCard({ user }) {
 
         {/* Basic Info */}
         <div className="space-y-2 mb-4">
-          <div className="flex items-center text-sm text-[#B0B0B0]">
-            <Calendar className="w-4 h-4 mr-2" />
-            <span>Class of {userData.graduationYear}</span>
-          </div>
-          <div className="flex items-center text-sm text-[#B0B0B0]">
-            <MapPin className="w-4 h-4 mr-2" />
-            <span>{userData.location}</span>
-          </div>
+          {userData.usn && (
+            <div className="flex items-center text-sm text-[#B0B0B0]">
+              <User className="w-4 h-4 mr-2" />
+              <span className="font-mono">{userData.usn}</span>
+            </div>
+          )}
           <div className="flex items-center text-sm text-[#B0B0B0]">
             <Briefcase className="w-4 h-4 mr-2" />
             <span>{userData.branch}</span>
           </div>
+          <div className="flex items-center text-sm text-[#B0B0B0]">
+            <Calendar className="w-4 h-4 mr-2" />
+            <span>Class of {userData.graduationYear}</span>
+          </div>
+          {userData.location && userData.location !== 'Not specified' && (
+            <div className="flex items-center text-sm text-[#B0B0B0]">
+              <MapPin className="w-4 h-4 mr-2" />
+              <span>{userData.location}</span>
+            </div>
+          )}
         </div>
 
         {/* Quick Links */}

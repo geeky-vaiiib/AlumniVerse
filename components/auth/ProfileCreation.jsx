@@ -3,20 +3,25 @@
 import { useState } from "react"
 import ProfileCreationFlow from "../profile/ProfileCreationFlow"
 import ProfileSuccessToast from "../profile/ProfileSuccessToast"
+import { useUser } from "../../contexts/UserContext"
 
 export default function ProfileCreation({ userData, onStepChange }) {
   const [showSuccessToast, setShowSuccessToast] = useState(false)
+  const { refreshProfile } = useUser()
 
-  const handleProfileComplete = (userProfile) => {
+  const handleProfileComplete = async (userProfile) => {
     setShowSuccessToast(true)
+
+    // Refresh the user profile context with the new data
+    try {
+      await refreshProfile()
+    } catch (error) {
+      console.error('Failed to refresh profile:', error)
+    }
 
     // Redirect after showing success message
     setTimeout(() => {
-      if (onStepChange) {
-        onStepChange("dashboard", userProfile)
-      } else {
-        window.location.href = "/dashboard"
-      }
+      window.location.href = "/dashboard"
     }, 2000)
   }
 

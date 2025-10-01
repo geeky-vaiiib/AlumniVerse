@@ -11,7 +11,7 @@ const {
   eventValidation,
   eventQueryValidation
 } = require('../controllers/eventsController');
-const { authenticateToken, optionalAuth } = require('../middlewares/authMiddleware');
+const { authenticateToken, optionalAuth } = require('../middlewares/supabaseAuthMiddleware');
 
 const router = express.Router();
 

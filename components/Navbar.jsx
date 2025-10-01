@@ -68,13 +68,34 @@ export default function Navbar() {
 
           {/* Right Side - Auth Buttons */}
           <div className="hidden md:flex items-center space-x-4">
-            <button className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
-              <a href="/auth">Login</a>
-              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-            </button>
-            <button className="bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors hover-glow">
-              <a href="/auth?mode=signup">Get Started</a>
-            </button>
+            {user ? (
+              <>
+                <Link href="/profile" className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+                  Profile
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                </Link>
+                <Link href="/dashboard" className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+                  Dashboard
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                </Link>
+                <button 
+                  onClick={handleSignOut}
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-2 rounded-md transition-colors"
+                >
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <>
+                <Link href="/login" className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+                  Login
+                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                </Link>
+                <Link href="/auth" className="bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors hover-glow">
+                  Get Started
+                </Link>
+              </>
+            )}
           </div>
 
           {/* Mobile menu button */}

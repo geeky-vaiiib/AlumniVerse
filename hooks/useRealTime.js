@@ -5,7 +5,11 @@
 
 import { useEffect, useCallback, useRef } from 'react'
 import { useApp } from '../contexts/AppContext'
+import { useUser } from '../contexts/UserContext'
 import { mockAPI } from '../lib/mockAPI'
+import * as postsAPI from '../lib/api/posts'
+import * as jobsAPI from '../lib/api/jobs'
+import * as eventsAPI from '../lib/api/events'
 
 // Custom hook for real-time alumni data
 export function useAlumni() {
@@ -76,48 +80,84 @@ export function useAlumni() {
 // Custom hook for real-time job data
 export function useJobs() {
   const { state, dispatch, actionTypes } = useApp()
+  const { userProfile } = useUser()
   const { jobs, jobFilters, jobsLoading, savedJobs } = state
 
   const loadJobs = useCallback(async (filters = {}) => {
     dispatch({ type: actionTypes.SET_JOBS_LOADING, payload: true })
     try {
-      const response = await mockAPI.getJobs(filters)
-      dispatch({ type: actionTypes.SET_JOBS, payload: response.data })
+      const { data, error } = await jobsAPI.fetchJobs({ limit: 50, activeOnly: true })
+      if (error) throw error
+
+      // Check which jobs are bookmarked by user
+      if (userProfile?.id && data.length > 0) {
+        const jobIds = data.map(j => j.id)
+        const { data: bookmarks } = await jobsAPI.checkUserBookmarks(jobIds, userProfile.id)
+
+        // Update isSaved status
+        data.forEach(job => {
+          job.isSaved = bookmarks[job.id] || false
+        })
+      }
+
+      dispatch({ type: actionTypes.SET_JOBS, payload: data })
     } catch (error) {
+      console.error('Error loading jobs:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   const updateFilters = useCallback((newFilters) => {
     dispatch({ type: actionTypes.SET_JOB_FILTERS, payload: newFilters })
   }, [dispatch, actionTypes])
 
   const toggleSavedJob = useCallback(async (jobId) => {
+    if (!userProfile?.id) {
+      dispatch({
+        type: actionTypes.SET_TOAST,
+        payload: {
+          type: 'error',
+          message: 'Please log in to save jobs'
+        }
+      })
+      return
+    }
+
     try {
-      await mockAPI.toggleJobBookmark(jobId)
+      const { isSaved, error } = await jobsAPI.toggleJobBookmark(jobId, userProfile.id)
+      if (error) throw error
+
       dispatch({ type: actionTypes.TOGGLE_SAVED_JOB, payload: jobId })
-      
-      const job = jobs.find(j => j.id === jobId)
-      const isSaved = savedJobs.includes(jobId)
-      
+
       dispatch({
         type: actionTypes.SET_TOAST,
         payload: {
           type: 'success',
-          message: isSaved ? 'Job removed from saved list' : 'Job saved successfully!'
+          message: isSaved ? 'Job saved successfully!' : 'Job removed from saved list'
         }
       })
-      
+
     } catch (error) {
+      console.error('Error toggling job bookmark:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
     }
-  }, [dispatch, actionTypes, jobs, savedJobs])
+  }, [dispatch, actionTypes, userProfile])
 
   const createJob = useCallback(async (jobData) => {
+    if (!userProfile?.id) {
+      throw new Error('User not authenticated')
+    }
+
     try {
-      const response = await mockAPI.createJob(jobData)
-      dispatch({ type: actionTypes.ADD_JOB, payload: response.data })
-      
+      const { data, error } = await jobsAPI.createJob({
+        ...jobData,
+        postedBy: userProfile.id
+      })
+
+      if (error) throw error
+
+      dispatch({ type: actionTypes.ADD_JOB, payload: data })
+
       dispatch({
         type: actionTypes.SET_TOAST,
         payload: {
@@ -125,13 +165,14 @@ export function useJobs() {
           message: 'Job posted successfully!'
         }
       })
-      
-      return response.data
+
+      return data
     } catch (error) {
+      console.error('Error creating job:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
       throw error
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   // Auto-reload jobs when filters change
   useEffect(() => {
@@ -153,47 +194,84 @@ export function useJobs() {
 // Custom hook for real-time event data
 export function useEvents() {
   const { state, dispatch, actionTypes } = useApp()
+  const { userProfile } = useUser()
   const { events, eventFilters, eventsLoading, registeredEvents } = state
 
   const loadEvents = useCallback(async (filters = {}) => {
     dispatch({ type: actionTypes.SET_EVENTS_LOADING, payload: true })
     try {
-      const response = await mockAPI.getEvents(filters)
-      dispatch({ type: actionTypes.SET_EVENTS, payload: response.data })
+      const { data, error } = await eventsAPI.fetchEvents({ limit: 50, upcomingOnly: true })
+      if (error) throw error
+
+      // Check which events user is registered for
+      if (userProfile?.id && data.length > 0) {
+        const eventIds = data.map(e => e.id)
+        const { data: registrations } = await eventsAPI.checkUserRegistrations(eventIds, userProfile.id)
+
+        // Update isRegistered status
+        data.forEach(event => {
+          event.isRegistered = registrations[event.id] || false
+        })
+      }
+
+      dispatch({ type: actionTypes.SET_EVENTS, payload: data })
     } catch (error) {
+      console.error('Error loading events:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   const updateFilters = useCallback((newFilters) => {
     dispatch({ type: actionTypes.SET_EVENT_FILTERS, payload: newFilters })
   }, [dispatch, actionTypes])
 
   const toggleEventRegistration = useCallback(async (eventId) => {
+    if (!userProfile?.id) {
+      dispatch({
+        type: actionTypes.SET_TOAST,
+        payload: {
+          type: 'error',
+          message: 'Please log in to register for events'
+        }
+      })
+      return
+    }
+
     try {
-      const response = await mockAPI.toggleEventRegistration(eventId)
+      const { isRegistered, error } = await eventsAPI.toggleEventRegistration(eventId, userProfile.id)
+      if (error) throw error
+
       dispatch({ type: actionTypes.TOGGLE_EVENT_REGISTRATION, payload: eventId })
-      
-      const isRegistered = registeredEvents.includes(eventId)
-      
+
       dispatch({
         type: actionTypes.SET_TOAST,
         payload: {
           type: 'success',
-          message: isRegistered ? 'Registration cancelled' : 'Successfully registered for event!'
+          message: isRegistered ? 'Successfully registered for event!' : 'Registration cancelled'
         }
       })
-      
+
     } catch (error) {
+      console.error('Error toggling event registration:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
     }
-  }, [dispatch, actionTypes, registeredEvents])
+  }, [dispatch, actionTypes, userProfile])
 
   const createEvent = useCallback(async (eventData) => {
+    if (!userProfile?.id) {
+      throw new Error('User not authenticated')
+    }
+
     try {
-      const response = await mockAPI.createEvent(eventData)
-      dispatch({ type: actionTypes.ADD_EVENT, payload: response.data })
-      
+      const { data, error } = await eventsAPI.createEvent({
+        ...eventData,
+        organizedBy: userProfile.id
+      })
+
+      if (error) throw error
+
+      dispatch({ type: actionTypes.ADD_EVENT, payload: data })
+
       dispatch({
         type: actionTypes.SET_TOAST,
         payload: {
@@ -201,13 +279,14 @@ export function useEvents() {
           message: 'Event created successfully!'
         }
       })
-      
-      return response.data
+
+      return data
     } catch (error) {
+      console.error('Error creating event:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
       throw error
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   // Auto-reload events when filters change
   useEffect(() => {
@@ -229,23 +308,52 @@ export function useEvents() {
 // Custom hook for real-time posts/news feed
 export function usePosts() {
   const { state, dispatch, actionTypes } = useApp()
+  const { userProfile } = useUser()
   const { posts, postsLoading } = state
 
   const loadPosts = useCallback(async () => {
     dispatch({ type: actionTypes.SET_POSTS_LOADING, payload: true })
     try {
-      const response = await mockAPI.getPosts()
-      dispatch({ type: actionTypes.SET_POSTS, payload: response.data })
+      const { data, error } = await postsAPI.fetchPosts({ limit: 50 })
+      if (error) throw error
+
+      // Check which posts are liked by user
+      if (userProfile?.id && data.length > 0) {
+        const postIds = data.map(p => p.id)
+        const { data: likes } = await postsAPI.checkUserLikes(postIds, userProfile.id)
+
+        // Update isLiked status
+        data.forEach(post => {
+          post.isLiked = likes[post.id] || false
+        })
+      }
+
+      dispatch({ type: actionTypes.SET_POSTS, payload: data })
     } catch (error) {
+      console.error('Error loading posts:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   const createPost = useCallback(async (postData) => {
+    if (!userProfile?.id) {
+      throw new Error('User not authenticated')
+    }
+
     try {
-      const response = await mockAPI.createPost(postData)
-      dispatch({ type: actionTypes.ADD_POST, payload: response.data })
-      
+      const { data, error } = await postsAPI.createPost({
+        content: postData.content,
+        post_type: postData.type || 'general',
+        images: postData.images || [],
+        links: postData.links || [],
+        tags: postData.tags || [],
+        author_id: userProfile.id
+      })
+
+      if (error) throw error
+
+      dispatch({ type: actionTypes.ADD_POST, payload: data })
+
       dispatch({
         type: actionTypes.SET_TOAST,
         payload: {
@@ -253,34 +361,67 @@ export function usePosts() {
           message: 'Post created successfully!'
         }
       })
-      
-      return response.data
+
+      return data
     } catch (error) {
+      console.error('Error creating post:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
       throw error
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   const likePost = useCallback(async (postId) => {
+    if (!userProfile?.id) {
+      dispatch({
+        type: actionTypes.SET_TOAST,
+        payload: {
+          type: 'error',
+          message: 'Please log in to like posts'
+        }
+      })
+      return
+    }
+
     try {
-      await mockAPI.likePost(postId)
+      const { error } = await postsAPI.togglePostLike(postId, userProfile.id)
+      if (error) throw error
+
       dispatch({ type: actionTypes.LIKE_POST, payload: postId })
     } catch (error) {
+      console.error('Error liking post:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   const addComment = useCallback(async (postId, commentData) => {
+    if (!userProfile?.id) {
+      dispatch({
+        type: actionTypes.SET_TOAST,
+        payload: {
+          type: 'error',
+          message: 'Please log in to comment'
+        }
+      })
+      return
+    }
+
     try {
-      const response = await mockAPI.addComment(postId, commentData)
-      dispatch({ 
-        type: actionTypes.ADD_COMMENT, 
-        payload: { postId, comment: response.data }
+      const { data, error } = await postsAPI.addComment(postId, {
+        author_id: userProfile.id,
+        content: commentData.content
+      })
+
+      if (error) throw error
+
+      dispatch({
+        type: actionTypes.ADD_COMMENT,
+        payload: { postId, comment: data }
       })
     } catch (error) {
+      console.error('Error adding comment:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
     }
-  }, [dispatch, actionTypes])
+  }, [dispatch, actionTypes, userProfile])
 
   // Load posts on mount
   useEffect(() => {

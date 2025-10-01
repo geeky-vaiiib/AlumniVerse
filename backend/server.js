@@ -17,11 +17,12 @@ const { globalErrorHandler, notFound } = require('./middlewares/errorMiddleware'
 const supabaseAuthRoutes = require('./routes/supabaseAuthRoutes');
 const supabaseStorageRoutes = require('./routes/supabaseStorageRoutes');
 const profileRoutes = require('./routes/profileRoutes'); // Enhanced profile routes
+const postsRoutes = require('./routes/postsRoutes'); // Social posts routes
+const jobsRoutes = require('./routes/jobsRoutes'); // Jobs routes
+const eventsRoutes = require('./routes/eventsRoutes'); // Events routes
 // Temporarily disabled until we update middleware to use Supabase
 // const userRoutes = require('./routes/userRoutes');
 // const directoryRoutes = require('./routes/directoryRoutes');
-// const jobsRoutes = require('./routes/jobsRoutes');
-// const eventsRoutes = require('./routes/eventsRoutes');
 // const badgesRoutes = require('./routes/badgesRoutes');
 
 /**
@@ -135,11 +136,12 @@ app.use('/api/auth', authLimiter, supabaseAuthRoutes); // Supabase auth (primary
 // app.use('/api/auth-legacy', authLimiter, authRoutes); // Legacy auth (disabled)
 app.use('/api/storage', supabaseStorageRoutes); // Supabase storage
 app.use('/api/profile', profileRoutes); // Enhanced profile routes
+app.use('/api/posts', postsRoutes); // Social posts routes
+app.use('/api/jobs', jobsRoutes); // Jobs routes
+app.use('/api/events', eventsRoutes); // Events routes
 // Temporarily disabled until we update middleware to use Supabase
 // app.use('/api/users', userRoutes);
 // app.use('/api/directory', directoryRoutes);
-// app.use('/api/jobs', jobsRoutes);
-// app.use('/api/events', eventsRoutes);
 // app.use('/api/badges', badgesRoutes);
 
 // API documentation endpoint

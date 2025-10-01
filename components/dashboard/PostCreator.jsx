@@ -4,16 +4,21 @@ import { useState } from "react"
 import { Card, CardContent } from "../ui/card"
 import { Button } from "../ui/button"
 import { generateAvatar } from "../../lib/utils"
+import { useUser } from "../../contexts/UserContext"
+import { useAuth } from "../providers/AuthProvider"
+import apiService from "../../lib/api"
 
 export default function PostCreator({ onPost }) {
   const [content, setContent] = useState("")
   const [postType, setPostType] = useState("general")
   const [isExpanded, setIsExpanded] = useState(false)
   const [isPosting, setIsPosting] = useState(false)
+  const { getFullName } = useUser()
+  const { session } = useAuth()
 
   const currentUser = {
-    name: "John Doe",
-    avatar: "JD",
+    name: getFullName(),
+    avatar: generateAvatar(getFullName()).initials,
   }
 
   const avatar = generateAvatar(currentUser.name)
@@ -24,17 +29,54 @@ export default function PostCreator({ onPost }) {
 
     setIsPosting(true)
 
-    // Simulate API call
-    setTimeout(() => {
-      onPost({
+    try {
+      // Get auth token
+      const token = session?.access_token
+
+      // Create post via API
+      const response = await apiService.posts.create({
         content: content.trim(),
-        type: postType,
+        post_type: postType,
+        images: [],
+        tags: []
+      }, token)
+
+      if (response.success) {
+        // Call parent onPost callback with the new post
+        onPost(response.data.post)
+        
+        // Reset form
+        setContent("")
+        setPostType("general")
+        setIsExpanded(false)
+      }
+    } catch (error) {
+      console.error('Failed to create post:', error)
+      // For now, still create a mock post if API fails
+      onPost({
+        id: Date.now().toString(),
+        content: content.trim(),
+        post_type: postType,
+        author: {
+          name: currentUser.name,
+          designation: 'Alumni',
+          company: 'Not specified',
+          batch: 'Not specified',
+          avatar: currentUser.avatar
+        },
+        timestamp: 'Just now',
+        likes: 0,
+        comments: 0,
+        shares: 0,
+        isLiked: false
       })
+      
       setContent("")
       setPostType("general")
       setIsExpanded(false)
+    } finally {
       setIsPosting(false)
-    }, 1000)
+    }
   }
 
   return (

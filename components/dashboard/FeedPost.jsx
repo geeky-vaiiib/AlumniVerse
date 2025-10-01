@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Card, CardContent } from "../ui/card"
 import { generateAvatar } from "../../lib/utils"
+import Link from "next/link"
 
 export default function FeedPost({ post, onLike }) {
   const [showComments, setShowComments] = useState(false)
@@ -17,18 +18,7 @@ export default function FeedPost({ post, onLike }) {
     setNewComment("")
   }
 
-  const getBadgeColor = (badge) => {
-    switch (badge) {
-      case "Career Milestone":
-        return "bg-success/20 text-success"
-      case "Achievement":
-        return "bg-warning/20 text-warning"
-      case "Job Opportunity":
-        return "bg-primary/20 text-primary"
-      default:
-        return "bg-muted text-foreground-muted"
-    }
-  }
+
 
   return (
     <Card className="hover:shadow-lg hover:shadow-primary/5 transition-all duration-300">
@@ -44,10 +34,9 @@ export default function FeedPost({ post, onLike }) {
 
           <div className="flex-1 min-w-0">
             <div className="flex items-center space-x-2 mb-1">
-              <h3 className="font-semibold text-foreground">{post.author.name}</h3>
-              {post.badge && (
-                <span className={`px-2 py-1 text-xs rounded-full ${getBadgeColor(post.badge)}`}>{post.badge}</span>
-              )}
+              <Link href={`/profile/${post.author.id || post.author_id}`} className="hover:underline">
+                <h3 className="font-semibold text-foreground">{post.author.name}</h3>
+              </Link>
             </div>
             <p className="text-sm text-foreground-muted">
               {post.author.designation} at {post.author.company} • Class of {post.author.batch}

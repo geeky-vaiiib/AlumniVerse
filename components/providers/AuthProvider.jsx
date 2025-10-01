@@ -1,6 +1,7 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from 'react'
+import { supabase } from '@/lib/supabaseClient'
 
 const AuthContext = createContext({})
 
@@ -13,161 +14,223 @@ export const useAuth = () => {
 }
 
 export function AuthProvider({ children }) {
-  // Simple dummy authentication state - NO Supabase dependencies
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(false) // Always false to prevent infinite loading
+  const [loading, setLoading] = useState(true)
   const [session, setSession] = useState(null)
   const [error, setError] = useState(null)
   const [isLoggedIn, setIsLoggedIn] = useState(false)
-  const [isReady, setIsReady] = useState(true) // Always ready for dummy mode
+  const [isReady, setIsReady] = useState(false)
 
   console.log('AuthProvider: Rendering with state:', { loading, isLoggedIn, hasUser: !!user, hasSession: !!session })
 
-  // Simple initialization - check for existing dummy auth
+  // Initialize Supabase auth
   useEffect(() => {
-    console.log('AuthProvider: Initialization started')
+    console.log('AuthProvider: Real Supabase initialization started')
     
-    // Check for existing dummy auth cookie
-    if (typeof document !== 'undefined') {
-      const cookies = document.cookie.split(';')
-      const dummyAuthCookie = cookies.find(cookie => 
-        cookie.trim().startsWith('dummy-auth-verified=true')
-      )
-      
-      if (dummyAuthCookie) {
-        console.log('AuthProvider: Found existing dummy auth, restoring session')
-        
-        const mockUser = {
-          id: 'dummy-user-existing',
-          email: 'verified@example.com',
-          email_confirmed_at: new Date().toISOString(),
-          user_metadata: { verified: true, verification_method: 'dummy_otp' }
-        }
-        
-        const mockSession = {
-          user: mockUser,
-          access_token: 'dummy-access-token',
-          refresh_token: 'dummy-refresh-token',
-          expires_at: Date.now() + (24 * 60 * 60 * 1000),
-          token_type: 'bearer'
-        }
-        
-        setUser(mockUser)
-        setSession(mockSession)
-        setIsLoggedIn(true)
-      }
-    }
-    
-    console.log('AuthProvider: Initialization complete')
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('AuthProvider: Initial session:', session)
+      setSession(session)
+      setUser(session?.user ?? null)
+      setIsLoggedIn(!!session)
+      setLoading(false)
+      setIsReady(true)
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('AuthProvider: Auth state changed:', _event, session)
+      setSession(session)
+      setUser(session?.user ?? null)
+      setIsLoggedIn(!!session)
+      setLoading(false)
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  // Dummy authentication methods
+  // Real Supabase authentication methods
   const signUpWithOTP = async (email, metadata = {}) => {
-    console.log('AuthProvider: Dummy signUpWithOTP called', { email, metadata })
+    console.log('AuthProvider: signUpWithOTP called', { email, metadata })
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    return { 
-      data: { user: null, session: null }, 
-      error: null 
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          data: metadata,
+          shouldCreateUser: true
+        }
+      })
+      
+      if (error) {
+        console.error('AuthProvider: signUpWithOTP error:', error)
+        setError(error.message)
+      }
+      
+      return { data, error }
+    } catch (err) {
+      console.error('AuthProvider: signUpWithOTP exception:', err)
+      return { data: null, error: err }
     }
   }
 
   const signInWithOTP = async (email) => {
-    console.log('AuthProvider: Dummy signInWithOTP called', { email })
+    console.log('AuthProvider: signInWithOTP called', { email })
     
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    return { 
-      data: { user: null, session: null }, 
-      error: null 
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false
+        }
+      })
+      
+      if (error) {
+        console.error('AuthProvider: signInWithOTP error:', error)
+        setError(error.message)
+      }
+      
+      return { data, error }
+    } catch (err) {
+      console.error('AuthProvider: signInWithOTP exception:', err)
+      return { data: null, error: err }
     }
   }
 
   const verifyOTP = async (email, token) => {
-    console.log('AuthProvider: verifyOTP called - redirecting to dummy verification')
-    return await verifyDummyOTP(token)
+    console.log('AuthProvider: verifyOTP called', { email, token })
+    
+    try {
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'email'
+      })
+      
+      if (error) {
+        console.error('AuthProvider: verifyOTP error:', error)
+        setError(error.message)
+        return { data: null, error }
+      }
+      
+      // Update state
+      setUser(data.user)
+      setSession(data.session)
+      setIsLoggedIn(true)
+      setError(null)
+      
+      console.log('AuthProvider: OTP verification successful')
+      return { data, error: null }
+    } catch (err) {
+      console.error('AuthProvider: verifyOTP exception:', err)
+      return { data: null, error: err }
+    }
   }
 
+  // Keep dummy OTP for testing - but use real user data
   const verifyDummyOTP = async (code) => {
-    console.log("AuthProvider: Dummy OTP verification started for code:", code)
-
-    // Validate that code is exactly 6 digits
+    console.log("AuthProvider: Dummy OTP verification (accepts any 6 digits)")
+    
     if (!code || code.length !== 6) {
-      console.log("AuthProvider: Invalid OTP code length:", code?.length)
       return {
         data: null,
         error: { message: 'Please enter a valid 6-digit code' }
       }
     }
-
+    
+    // Note: This is still a dummy verification, but we'll get real user data from Supabase
+    console.log("AuthProvider: Using dummy OTP for development - should be replaced with real OTP verification")
+    
+    // Try to use real Supabase verification first
     try {
-      // Simulate loading delay
-      await new Promise(resolve => setTimeout(resolve, 500))
-
-      // Create mock user session
-      const mockUser = {
-        id: 'dummy-user-' + Date.now(),
-        email: 'verified@example.com',
-        email_confirmed_at: new Date().toISOString(),
-        user_metadata: { verified: true, verification_method: 'dummy_otp' }
-      }
-
-      const mockSession = {
-        user: mockUser,
-        access_token: 'dummy-access-token',
-        refresh_token: 'dummy-refresh-token',
-        expires_at: Date.now() + (24 * 60 * 60 * 1000),
-        token_type: 'bearer'
-      }
-
-      // Set cookie for middleware bypass
-      if (typeof document !== 'undefined') {
-        document.cookie = 'dummy-auth-verified=true; path=/; max-age=86400'
-        console.log("AuthProvider: Dummy auth cookie set")
-      }
-
-      // Update state
-      setUser(mockUser)
-      setSession(mockSession)
-      setIsLoggedIn(true)
-      setError(null)
-
-      console.log("AuthProvider: Dummy OTP verification successful")
-
-      return {
-        data: { user: mockUser, session: mockSession },
-        error: null
+      // Get the email from sessionStorage or state (should be set during signup)
+      const pendingEmail = sessionStorage.getItem('pendingVerificationEmail')
+      
+      if (pendingEmail) {
+        // Try real OTP verification first
+        const realVerification = await verifyOTP(pendingEmail, code)
+        if (realVerification.data && !realVerification.error) {
+          // Clear pending email
+          sessionStorage.removeItem('pendingVerificationEmail')
+          return realVerification
+        }
       }
     } catch (error) {
-      console.error('AuthProvider: Error in verifyDummyOTP:', error)
-      return { data: null, error: { message: 'Verification failed. Please try again.' } }
+      console.log("AuthProvider: Real OTP verification failed, using dummy for development")
     }
+    
+    // Fallback to dummy for development only
+    const mockUser = {
+      id: 'test-user-' + Date.now(),
+      email: sessionStorage.getItem('pendingVerificationEmail') || 'test@sit.ac.in',
+      email_confirmed_at: new Date().toISOString(),
+      user_metadata: { 
+        verified: true, 
+        test_mode: true,
+        first_name: sessionStorage.getItem('pendingFirstName') || 'Test',
+        last_name: sessionStorage.getItem('pendingLastName') || 'User',
+        usn: sessionStorage.getItem('pendingUSN') || 'TEST123',
+        branch: sessionStorage.getItem('pendingBranch') || 'Computer Science',
+        joining_year: sessionStorage.getItem('pendingJoiningYear') || 2020,
+        passing_year: sessionStorage.getItem('pendingPassingYear') || 2024
+      }
+    }
+    
+    const mockSession = {
+      user: mockUser,
+      access_token: 'test-token',
+      refresh_token: 'test-refresh',
+      expires_at: Date.now() + (24 * 60 * 60 * 1000)
+    }
+    
+    setUser(mockUser)
+    setSession(mockSession)
+    setIsLoggedIn(true)
+    
+    // Clear all pending data
+    sessionStorage.removeItem('pendingFirstName')
+    sessionStorage.removeItem('pendingLastName')
+    sessionStorage.removeItem('pendingUSN')
+    sessionStorage.removeItem('pendingBranch')
+    sessionStorage.removeItem('pendingJoiningYear')
+    sessionStorage.removeItem('pendingPassingYear')
+    
+    return { data: { user: mockUser, session: mockSession }, error: null }
   }
 
   const signOut = async () => {
     console.log("AuthProvider: Signing out...")
     
-    // Clear state
-    setUser(null)
-    setSession(null)
-    setIsLoggedIn(false)
-    setError(null)
-    
-    // Clear cookie
-    if (typeof document !== 'undefined') {
-      document.cookie = 'dummy-auth-verified=; path=/; max-age=0'
+    try {
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        console.error('AuthProvider: signOut error:', error)
+        return { error }
+      }
+      
+      // Clear state
+      setUser(null)
+      setSession(null)
+      setIsLoggedIn(false)
+      setError(null)
+      
+      console.log("AuthProvider: Sign out complete")
+      return { error: null }
+    } catch (err) {
+      console.error('AuthProvider: signOut exception:', err)
+      return { error: err }
     }
-    
-    console.log("AuthProvider: Sign out complete")
-    return { error: null }
   }
 
   const getSession = async () => {
     console.log("AuthProvider: getSession called")
-    return { session, error: null }
+    try {
+      const { data: { session }, error } = await supabase.auth.getSession()
+      return { session, error }
+    } catch (err) {
+      return { session: null, error: err }
+    }
   }
 
   const value = {

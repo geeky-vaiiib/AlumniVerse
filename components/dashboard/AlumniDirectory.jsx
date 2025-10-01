@@ -8,6 +8,7 @@ import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import { useAlumni } from "../../hooks/useRealTime"
 import { getInitials, safeMap, ensureArray, safeLength } from "../../lib/utils"
+import Link from "next/link"
 import {
   Search,
   Filter,
@@ -342,7 +343,9 @@ export default function AlumniDirectory() {
                   </Avatar>
                   <div>
                     <div className="flex items-center space-x-2">
-                      <h3 className="font-semibold text-white">{person.name}</h3>
+                      <Link href={`/profile/${person.id}`} className="hover:underline">
+                        <h3 className="font-semibold text-white">{person.name}</h3>
+                      </Link>
                       {person.isVerified && (
                         <div className="w-4 h-4 bg-[#4A90E2] rounded-full flex items-center justify-center">
                           <span className="text-white text-xs">✓</span>

@@ -1,6 +1,7 @@
 import "./globals.css"
 import { AuthProvider } from "@/components/providers/AuthProvider"
 import { AppProvider } from "@/contexts/AppContext"
+import { UserProvider } from "@/contexts/UserContext"
 import { Toaster } from "@/components/ui/toaster"
 import DynamicToast from "@/components/ui/DynamicToast"
 import ErrorBoundary from "@/components/ui/ErrorBoundary"
@@ -17,11 +18,13 @@ export default function RootLayout({ children }) {
       <body className="min-h-screen bg-[#1A1A1A] text-white">
         <AppProvider>
           <AuthProvider>
-            <ErrorBoundary fallbackMessage="The application encountered an unexpected error. Please refresh the page.">
-              {children}
-            </ErrorBoundary>
-            <Toaster />
-            <DynamicToast />
+            <UserProvider>
+              <ErrorBoundary fallbackMessage="The application encountered an unexpected error. Please refresh the page.">
+                {children}
+              </ErrorBoundary>
+              <Toaster />
+              <DynamicToast />
+            </UserProvider>
           </AuthProvider>
         </AppProvider>
       </body>

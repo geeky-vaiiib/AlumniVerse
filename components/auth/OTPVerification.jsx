@@ -12,6 +12,7 @@ import { useToast } from "../../hooks/use-toast"
 export default function OTPVerification({
   email,
   firstName,
+  lastName,
   isSignUp = false,
   userData = {},
   onStepChange
@@ -132,8 +133,15 @@ export default function OTPVerification({
 
         // Small delay to show success message
         setTimeout(() => {
-          console.log('Dummy OTP verification successful, redirecting to profile creation')
-          onStepChange('profile', { email, firstName, isSignUp, userData })
+          console.log('Dummy OTP verification successful, redirecting to dashboard')
+          
+          if (isSignUp) {
+            // For new signups, go to profile creation
+            onStepChange('profile', { email, firstName, lastName, isSignUp, userData })
+          } else {
+            // For existing users (login), go directly to dashboard
+            router.push('/dashboard')
+          }
         }, 1500)
       } else {
         setVerifyAttempts(prev => prev + 1)
@@ -201,8 +209,8 @@ export default function OTPVerification({
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-[#2D2D2D] border-[#404040]">
+    <div className="flex items-center justify-center p-4 py-12">
+      <Card className="w-full max-w-md bg-surface border-border">
         <CardHeader className="text-center space-y-2">
           <div className="mx-auto w-12 h-12 bg-[#4A90E2]/20 rounded-full flex items-center justify-center mb-4">
             <Mail className="w-6 h-6 text-[#4A90E2]" />

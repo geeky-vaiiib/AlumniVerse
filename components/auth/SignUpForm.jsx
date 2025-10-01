@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { GraduationCap, Mail, AlertCircle } from "lucide-react"
+import { GraduationCap, Mail, AlertCircle, Eye, EyeOff, Lock } from "lucide-react"
 import { useAuth } from "../providers/AuthProvider"
 import { parseInstitutionalEmail } from "../../lib/utils/emailParser"
 
@@ -14,7 +14,11 @@ export default function SignUpForm({ onStepChange }) {
     firstName: "",
     lastName: "",
     email: "",
+    password: "",
+    confirmPassword: "",
   })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [extractedData, setExtractedData] = useState(null)
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
@@ -72,6 +76,22 @@ export default function SignUpForm({ onStepChange }) {
     // Validate email format and domain
     if (formData.email && !formData.email.endsWith('@sit.ac.in')) {
       newErrors.email = "Please use your SIT institutional email (@sit.ac.in)"
+    }
+
+    // Validate password
+    if (!formData.password) {
+      newErrors.password = "Password is required"
+    } else if (formData.password.length < 8) {
+      newErrors.password = "Password must be at least 8 characters"
+    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
+      newErrors.password = "Password must contain uppercase, lowercase, and number"
+    }
+
+    // Validate confirm password
+    if (!formData.confirmPassword) {
+      newErrors.confirmPassword = "Please confirm your password"
+    } else if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match"
     }
 
     // Validate extracted data
@@ -139,10 +159,23 @@ export default function SignUpForm({ onStepChange }) {
 
       console.log('OTP sent successfully:', data)
 
+      // Store user data in sessionStorage for the OTP verification
+      sessionStorage.setItem('pendingVerificationEmail', formData.email.trim().toLowerCase())
+      sessionStorage.setItem('pendingFirstName', formData.firstName.trim())
+      sessionStorage.setItem('pendingLastName', formData.lastName.trim())
+      if (extractedData) {
+        sessionStorage.setItem('pendingUSN', extractedData.usn || '')
+        sessionStorage.setItem('pendingBranch', extractedData.branch || '')
+        sessionStorage.setItem('pendingJoiningYear', extractedData.joiningYear || '')
+        sessionStorage.setItem('pendingPassingYear', extractedData.passingYear || '')
+      }
+
       // Move to OTP verification step
       onStepChange('otp-verification', {
         email: formData.email.trim().toLowerCase(),
         firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
+        password: formData.password,
         isSignUp: true,
         userData: metadata
       })
@@ -156,8 +189,8 @@ export default function SignUpForm({ onStepChange }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#1A1A1A] flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-[#2D2D2D] border-[#404040] shadow-2xl">
+    <div className="flex items-center justify-center p-4 py-12">
+      <Card className="w-full max-w-md bg-surface border-border shadow-2xl">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-[#4A90E2]/10 rounded-full flex items-center justify-center">
             <GraduationCap className="w-8 h-8 text-[#4A90E2]" />
@@ -223,6 +256,60 @@ export default function SignUpForm({ onStepChange }) {
               />
               {errors.email && (
                 <p className="text-red-400 text-sm">{errors.email}</p>
+              )}
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#E0E0E0]">
+                Password
+              </label>
+              <div className="relative">
+                <Input
+                  type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] pr-10"
+                  placeholder="Create a strong password"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B0B0B0] hover:text-white"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {errors.password && (
+                <p className="text-red-400 text-sm">{errors.password}</p>
+              )}
+            </div>
+
+            {/* Confirm Password */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-[#E0E0E0]">
+                Confirm Password
+              </label>
+              <div className="relative">
+                <Input
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={formData.confirmPassword}
+                  onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                  className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] pr-10"
+                  placeholder="Confirm your password"
+                  disabled={isLoading}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[#B0B0B0] hover:text-white"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              {errors.confirmPassword && (
+                <p className="text-red-400 text-sm">{errors.confirmPassword}</p>
               )}
             </div>
 

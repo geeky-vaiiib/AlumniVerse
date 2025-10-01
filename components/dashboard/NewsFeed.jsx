@@ -8,6 +8,7 @@ import { Textarea } from "../ui/textarea"
 import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import { usePosts } from "../../hooks/useRealTime"
+import { useUser } from "../../contexts/UserContext"
 import { getInitials, formatTimestamp, extractHashtags, safeMap, ensureArray } from "../../lib/utils"
 import { 
   Heart, 
@@ -28,6 +29,7 @@ import {
 
 export default function NewsFeed() {
   const { posts, postsLoading, createPost, likePost, addComment } = usePosts()
+  const { userProfile, getFullName, getInitials: getUserInitials } = useUser()
   const [isCreatingPost, setIsCreatingPost] = useState(false)
   const [newPost, setNewPost] = useState({
     content: '',
@@ -44,11 +46,13 @@ export default function NewsFeed() {
     try {
       await createPost({
         author: {
-          id: 'current-user',
-          name: 'You',
-          avatar: null,
-          designation: 'Alumni Member',
-          isVerified: true
+          id: userProfile?.id || 'current-user',
+          name: getFullName(),
+          avatar: userProfile?.avatarUrl || null,
+          designation: userProfile?.designation || 'Alumni Member',
+          company: userProfile?.currentCompany || '',
+          batch: userProfile?.passingYear || '',
+          isVerified: userProfile?.profileCompleted || false
         },
         content: newPost.content,
         images: newPost.images,
@@ -73,9 +77,9 @@ export default function NewsFeed() {
 
     await addComment(postId, {
       author: {
-        id: 'current-user',
-        name: 'You',
-        avatar: null
+        id: userProfile?.id || 'current-user',
+        name: getFullName(),
+        avatar: userProfile?.avatarUrl || null
       },
       content
     })
