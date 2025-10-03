@@ -20,6 +20,7 @@ import {
   Building,
   GraduationCap
 } from "lucide-react"
+import { validateGitHubUrl, validateLinkedInUrl, validateLeetCodeUrl, URL_VALIDATION_MESSAGES } from "../../lib/utils/urlValidation"
 
 // Step configuration
 const STEPS = [
@@ -150,22 +151,22 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
         case 'linkedinUrl':
           if (!value || !value.trim()) {
             newErrors[field] = 'LinkedIn profile URL is required'
-          } else if (!urlPatterns.linkedin.test(value)) {
-            newErrors[field] = 'Please enter a valid LinkedIn URL'
+          } else if (!validateLinkedInUrl(value)) {
+            newErrors[field] = URL_VALIDATION_MESSAGES.linkedin
           }
           break
         case 'githubUrl':
           if (!value || !value.trim()) {
             newErrors[field] = 'GitHub profile URL is required'
-          } else if (!urlPatterns.github.test(value)) {
-            newErrors[field] = 'Please enter a valid GitHub URL'
+          } else if (!validateGitHubUrl(value)) {
+            newErrors[field] = URL_VALIDATION_MESSAGES.github
           }
           break
         case 'leetcodeUrl':
           if (!value || !value.trim()) {
             newErrors[field] = 'LeetCode profile URL is required'
-          } else if (!urlPatterns.leetcode.test(value)) {
-            newErrors[field] = 'Please enter a valid LeetCode URL'
+          } else if (!validateLeetCodeUrl(value)) {
+            newErrors[field] = URL_VALIDATION_MESSAGES.leetcode
           }
           break
         case 'resumeUrl':
@@ -329,26 +330,27 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
         return
       }
 
-      // Also save to users table in database
+      // Also save to users table in database with proper null handling
       const { error: dbError } = await supabase
         .from('users')
         .upsert({
           auth_id: user.id,
           email: user.email,
-          first_name: formData.firstName,
-          last_name: formData.lastName,
-          usn: formData.usn || userData?.userData?.usn || '',
-          branch: formData.branch,
+          first_name: formData.firstName || null,
+          last_name: formData.lastName || null,
+          usn: formData.usn || userData?.userData?.usn || null,
+          branch: formData.branch || null,
           admission_year: formData.joiningYear || userData?.userData?.joining_year || null,
-          passing_year: parseInt(formData.yearOfPassing),
-          company: formData.currentCompany,
-          current_position: formData.designation,
-          location: formData.location,
-          linkedin_url: formData.linkedinUrl,
-          github_url: formData.githubUrl,
-          leetcode_url: formData.leetcodeUrl,
-          resume_url: formData.resumeUrl,
-          is_profile_complete: true,
+          passing_year: formData.yearOfPassing ? parseInt(formData.yearOfPassing) : null,
+          company: formData.currentCompany || null,
+          current_position: formData.designation || null,
+          location: formData.location || null,
+          // Handle URL fields - validate and send null instead of empty strings to satisfy CHECK constraints
+          linkedin_url: validateLinkedInUrl(formData.linkedinUrl),
+          github_url: validateGitHubUrl(formData.githubUrl),
+          leetcode_url: validateLeetCodeUrl(formData.leetcodeUrl),
+          resume_url: (formData.resumeUrl && formData.resumeUrl.trim()) ? formData.resumeUrl.trim() : null,
+          profile_completed: true,
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'auth_id'
@@ -356,7 +358,8 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
 
       if (dbError) {
         console.error('Database profile save error:', dbError)
-        // Don't fail the whole process if DB save fails
+        setErrors({ submit: dbError.message || 'Failed to save profile to database' })
+        return
       }
 
       // Clear draft from localStorage

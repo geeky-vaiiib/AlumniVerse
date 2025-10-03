@@ -3,6 +3,7 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from '../components/providers/AuthProvider'
 import { supabase } from '../lib/supabaseClient'
+import { validateGitHubUrl, validateLinkedInUrl, validateLeetCodeUrl } from '../lib/utils/urlValidation'
 
 const UserContext = createContext()
 
@@ -86,7 +87,7 @@ export function UserProvider({ children }) {
           resumeUrl: authMetadata.resumeUrl || dbProfile?.resume_url || '',
           bio: authMetadata.bio || dbProfile?.bio || '',
           skills: authMetadata.skills || dbProfile?.skills || [],
-          profileCompleted: authMetadata.profileCompleted || dbProfile?.is_profile_complete || false,
+          profileCompleted: authMetadata.profileCompleted || dbProfile?.profile_completed || false,
           profileCompletion: authMetadata.profileCompletion || (
             // Calculate profile completion percentage
             calculateProfileCompletion({
@@ -176,7 +177,7 @@ export function UserProvider({ children }) {
         resumeUrl: authMetadata.resumeUrl || dbProfile?.resume_url || '',
         bio: authMetadata.bio || dbProfile?.bio || '',
         skills: authMetadata.skills || dbProfile?.skills || [],
-        profileCompleted: authMetadata.profileCompleted || dbProfile?.is_profile_complete || false,
+        profileCompleted: authMetadata.profileCompleted || dbProfile?.profile_completed || false,
         profileCompletion: authMetadata.profileCompletion || (
           calculateProfileCompletion({
             firstName: authMetadata.first_name || dbProfile?.first_name || '',
@@ -228,28 +229,30 @@ export function UserProvider({ children }) {
         throw authError
       }
 
-      // Update database profile if exists
+      // Update database profile with proper null handling
       const { error: dbError } = await supabase
         .from('users')
         .upsert({
           auth_id: user.id,
           email: user.email,
-          first_name: updates.firstName || userProfile?.firstName,
-          last_name: updates.lastName || userProfile?.lastName,
-          usn: updates.usn || userProfile?.usn,
-          branch: updates.branch || userProfile?.branch,
-          admission_year: updates.joiningYear || userProfile?.joiningYear,
-          passing_year: updates.passingYear || userProfile?.passingYear,
-          company: updates.currentCompany || userProfile?.currentCompany,
-          current_position: updates.designation || userProfile?.designation,
-          location: updates.location || userProfile?.location,
-          linkedin_url: updates.linkedinUrl || userProfile?.linkedinUrl,
-          github_url: updates.githubUrl || userProfile?.githubUrl,
-          leetcode_url: updates.leetcodeUrl || userProfile?.leetcodeUrl,
-          resume_url: updates.resumeUrl || userProfile?.resumeUrl,
-          bio: updates.bio || userProfile?.bio,
-          skills: updates.skills || userProfile?.skills,
-          is_profile_complete: updates.profileCompleted || userProfile?.profileCompleted,
+          first_name: updates.firstName || userProfile?.firstName || null,
+          last_name: updates.lastName || userProfile?.lastName || null,
+          usn: updates.usn || userProfile?.usn || null,
+          branch: updates.branch || userProfile?.branch || null,
+          admission_year: updates.joiningYear || userProfile?.joiningYear || null,
+          passing_year: updates.passingYear || userProfile?.passingYear || null,
+          company: updates.currentCompany || userProfile?.currentCompany || null,
+          current_position: updates.designation || userProfile?.designation || null,
+          location: updates.location || userProfile?.location || null,
+          // Handle URL fields - validate and send null instead of empty strings to satisfy CHECK constraints
+          linkedin_url: validateLinkedInUrl(updates.linkedinUrl) || validateLinkedInUrl(userProfile?.linkedinUrl),
+          github_url: validateGitHubUrl(updates.githubUrl) || validateGitHubUrl(userProfile?.githubUrl),
+          leetcode_url: validateLeetCodeUrl(updates.leetcodeUrl) || validateLeetCodeUrl(userProfile?.leetcodeUrl),
+          resume_url: (updates.resumeUrl && updates.resumeUrl.trim()) ? updates.resumeUrl.trim() : 
+                     (userProfile?.resumeUrl && userProfile.resumeUrl.trim()) ? userProfile.resumeUrl.trim() : null,
+          bio: updates.bio || userProfile?.bio || null,
+          skills: updates.skills || userProfile?.skills || null,
+          profile_completed: Boolean(updates.profileCompleted || userProfile?.profileCompleted),
           updated_at: new Date().toISOString()
         }, {
           onConflict: 'auth_id'
@@ -257,6 +260,7 @@ export function UserProvider({ children }) {
 
       if (dbError) {
         console.error('UserContext: Database update error:', dbError)
+        throw new Error(dbError.message || 'Failed to update user profile in database')
       }
 
       // Update local state
