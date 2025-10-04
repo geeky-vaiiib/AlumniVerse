@@ -18,7 +18,7 @@ export default function OTPVerification({
   onStepChange
 }) {
   const router = useRouter()
-  const { verifyOTP, verifyDummyOTP, signUpWithOTP, signInWithOTP, isReady } = useAuth()
+  const { verifyOTP, signUpWithOTP, signInWithOTP, isReady } = useAuth()
   const { toast } = useToast()
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
@@ -110,7 +110,7 @@ export default function OTPVerification({
     setError("")
 
     try {
-      console.log('Verifying Dummy OTP:', { email, token: otpCode })
+      console.log('Verifying OTP via Supabase:', { email })
 
       // Check if auth service is ready
       if (!isReady) {
@@ -118,22 +118,38 @@ export default function OTPVerification({
         return
       }
 
-      // Use dummy OTP verification - accepts any 6-digit code
-      const { data, error: authError } = await verifyDummyOTP(otpCode)
+      // Use enhanced AuthProvider OTP verification with profile creation
+      const { data, error: authError } = await verifyOTP(email, otpCode, {
+        first_name: firstName,
+        last_name: lastName,
+        usn: userData?.usn,
+        branch: userData?.branch,
+        branch_code: userData?.branch_code,
+        admission_year: userData?.joining_year,
+        passing_year: userData?.passing_year
+      })
 
-      if (!authError && data) {
+      if (!authError && data && data.user) {
         setSuccess("✅ Email verified successfully!")
 
         // Show success toast
         toast({
           title: "Verification Successful! 🎉",
-          description: "Your email has been verified. Redirecting to dashboard...",
+          description: "Your email has been verified. Redirecting...",
           variant: "default",
         })
 
         // Small delay to show success message
         setTimeout(() => {
-          console.log('Dummy OTP verification successful, redirecting to dashboard')
+          console.log('OTP verification successful')
+          // Clear any pending session storage
+          sessionStorage.removeItem('pendingVerificationEmail')
+          sessionStorage.removeItem('pendingFirstName')
+          sessionStorage.removeItem('pendingLastName')
+          sessionStorage.removeItem('pendingUSN')
+          sessionStorage.removeItem('pendingBranch')
+          sessionStorage.removeItem('pendingJoiningYear')
+          sessionStorage.removeItem('pendingPassingYear')
           
           if (isSignUp) {
             // For new signups, go to profile creation
@@ -145,7 +161,7 @@ export default function OTPVerification({
         }, 1500)
       } else {
         setVerifyAttempts(prev => prev + 1)
-        setError(authError?.message || "Invalid code. Please enter a 6-digit code.")
+        setError(authError?.message || "Verification failed. Please check your code and try again.")
 
         // Clear OTP inputs on error
         setOtp(["", "", "", "", "", ""])

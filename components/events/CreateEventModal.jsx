@@ -5,8 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
 import { Textarea } from "../ui/textarea"
+import { useEvents } from "../../hooks/useRealTime"
+import { useUser } from "../../contexts/UserContext"
 
 export default function CreateEventModal({ onClose, onSubmit }) {
+  const { createEvent } = useEvents()
+  const { getFullName } = useUser()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
   const [formData, setFormData] = useState({
     title: "",
     category: "Workshops",
@@ -49,26 +55,47 @@ export default function CreateEventModal({ onClose, onSubmit }) {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     
     if (!validateForm()) return
 
-    const eventData = {
-      ...formData,
-      id: Date.now(),
-      organizer: {
-        name: "Current User", // This would come from auth context
-        avatar: "/placeholder-user.jpg"
-      },
-      attendees: 0,
-      status: "upcoming",
-      tags: formData.tags.split(",").map(tag => tag.trim()).filter(tag => tag),
-      image: "/placeholder.jpg"
-    }
+    setIsSubmitting(true)
 
-    onSubmit(eventData)
-    onClose()
+    try {
+      // Combine date and time for the event datetime
+      const eventDateTime = new Date(`${formData.date}T${formData.time}`)
+      const registrationDeadline = formData.registrationDeadline 
+        ? new Date(formData.registrationDeadline) 
+        : null
+
+      const eventData = {
+        title: formData.title,
+        description: formData.description,
+        event_date: eventDateTime.toISOString(),
+        location: formData.location,
+        max_attendees: parseInt(formData.maxAttendees),
+        is_virtual: formData.isVirtual,
+        category: formData.category.toLowerCase(),
+        registration_deadline: registrationDeadline?.toISOString(),
+        tags: formData.tags.split(",").map(tag => tag.trim()).filter(tag => tag),
+        event_type: 'public'
+      }
+
+      const newEvent = await createEvent(eventData)
+
+      // Call parent onSubmit callback if provided
+      if (onSubmit && newEvent) {
+        onSubmit(newEvent)
+      }
+
+      onClose()
+    } catch (error) {
+      console.error('Failed to create event:', error)
+      // Error is already handled in the useEvents hook
+    } finally {
+      setIsSubmitting(false)
+    }
   }
 
   return (
@@ -260,9 +287,10 @@ export default function CreateEventModal({ onClose, onSubmit }) {
               </Button>
               <Button
                 type="submit"
+                disabled={isSubmitting}
                 className="flex-1 hover-glow"
               >
-                Create Event
+                {isSubmitting ? "Creating Event..." : "Create Event"}
               </Button>
             </div>
           </form>

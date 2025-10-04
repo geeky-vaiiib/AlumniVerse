@@ -6,7 +6,7 @@ import { Button } from "../ui/button"
 import { generateAvatar } from "../../lib/utils"
 import { useUser } from "../../contexts/UserContext"
 import { useAuth } from "../providers/AuthProvider"
-import apiService from "../../lib/api"
+import { usePosts } from "../../hooks/useRealTime"
 
 export default function PostCreator({ onPost }) {
   const [content, setContent] = useState("")
@@ -15,6 +15,7 @@ export default function PostCreator({ onPost }) {
   const [isPosting, setIsPosting] = useState(false)
   const { getFullName } = useUser()
   const { session } = useAuth()
+  const { createPost } = usePosts()
 
   const currentUser = {
     name: getFullName(),
@@ -30,50 +31,27 @@ export default function PostCreator({ onPost }) {
     setIsPosting(true)
 
     try {
-      // Get auth token
-      const token = session?.access_token
-
-      // Create post via API
-      const response = await apiService.posts.create({
+      // Create post using the real-time hook
+      const newPost = await createPost({
         content: content.trim(),
-        post_type: postType,
+        type: postType,
         images: [],
+        links: [],
         tags: []
-      }, token)
-
-      if (response.success) {
-        // Call parent onPost callback with the new post
-        onPost(response.data.post)
-        
-        // Reset form
-        setContent("")
-        setPostType("general")
-        setIsExpanded(false)
-      }
-    } catch (error) {
-      console.error('Failed to create post:', error)
-      // For now, still create a mock post if API fails
-      onPost({
-        id: Date.now().toString(),
-        content: content.trim(),
-        post_type: postType,
-        author: {
-          name: currentUser.name,
-          designation: 'Alumni',
-          company: 'Not specified',
-          batch: 'Not specified',
-          avatar: currentUser.avatar
-        },
-        timestamp: 'Just now',
-        likes: 0,
-        comments: 0,
-        shares: 0,
-        isLiked: false
       })
+
+      // Call parent onPost callback with the new post if provided
+      if (onPost && newPost) {
+        onPost(newPost)
+      }
       
+      // Reset form
       setContent("")
       setPostType("general")
       setIsExpanded(false)
+    } catch (error) {
+      console.error('Failed to create post:', error)
+      // The error is already handled in the usePosts hook
     } finally {
       setIsPosting(false)
     }

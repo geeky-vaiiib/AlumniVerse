@@ -1,4 +1,4 @@
-"use client"
+'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
@@ -15,221 +15,334 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [loading, setLoading] = useState(true)
   const [session, setSession] = useState(null)
-  const [error, setError] = useState(null)
-  const [isLoggedIn, setIsLoggedIn] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [isReady, setIsReady] = useState(false)
 
-  console.log('AuthProvider: Rendering with state:', { loading, isLoggedIn, hasUser: !!user, hasSession: !!session })
-
-  // Initialize Supabase auth
   useEffect(() => {
-    console.log('AuthProvider: Real Supabase initialization started')
+    let mounted = true
+
+    // Test Supabase connection
+    const testConnection = async () => {
+      try {
+        const { error } = await supabase.from('users').select('*').limit(1)
+        if (error) {
+          console.error('Supabase connection test failed:', error)
+        } else {
+          console.log('✅ Supabase users table reachable')
+        }
+      } catch (err) {
+        console.error('Supabase connection error:', err)
+      }
+    }
+
+    // Fetch or create user profile
+    const fetchOrCreateProfile = async (userId, userEmail) => {
+      try {
+        console.log('Fetching profile for user:', userId)
+        
+        // Try to fetch existing profile
+        const { data, error, status } = await supabase
+          .from('users')
+          .select('*')
+          .eq('auth_id', userId)
+          .maybeSingle()
+
+        if (error && status === 406) {
+          console.warn('Profile not found (406), creating via server endpoint...')
+          
+          // Create profile via server endpoint
+          const response = await fetch('/api/profile/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              auth_id: userId, 
+              email: userEmail 
+            })
+          })
+
+          if (!response.ok) {
+            const text = await response.text()
+            console.error('Server profile creation failed:', text)
+            return null
+          }
+
+          const result = await response.json()
+          console.log('✅ Profile created via server endpoint')
+          return result.data
+        }
+
+        if (error) {
+          console.error('Profile fetch error:', error)
+          return null
+        }
+
+        if (data) {
+          console.log('✅ Profile found in database')
+          return data
+        }
+
+        // No profile found, create one
+        console.log('No profile found, creating...')
+        const response = await fetch('/api/profile/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            auth_id: userId, 
+            email: userEmail 
+          })
+        })
+
+        if (response.ok) {
+          const result = await response.json()
+          console.log('✅ Profile created successfully')
+          return result.data
+        } else {
+          const errorText = await response.text()
+          console.error('Profile creation failed:', errorText)
+          return null
+        }
+
+      } catch (err) {
+        console.error('Profile fetch/create error:', err)
+        return null
+      }
+    }
+
+    // Get initial session with profile handling
+    const getInitialSession = async () => {
+      try {
+        const { data: { session }, error } = await supabase.auth.getSession()
+        
+        if (mounted) {
+          if (error) {
+            console.error('Error getting session:', error)
+            setSession(null)
+            setUser(null)
+          } else {
+            setSession(session)
+            setUser(session?.user ?? null)
+            
+            // If user is logged in, ensure profile exists
+            if (session?.user?.id) {
+              await fetchOrCreateProfile(session.user.id, session.user.email)
+            }
+          }
+          setLoading(false)
+          setIsReady(true)
+        }
+      } catch (error) {
+        console.error('Session initialization error:', error)
+        if (mounted) {
+          setSession(null)
+          setUser(null)
+          setLoading(false)
+          setIsReady(true)
+        }
+      }
+    }
+
+    // Test connection first
+    testConnection()
     
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('AuthProvider: Initial session:', session)
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoggedIn(!!session)
-      setLoading(false)
-      setIsReady(true)
-    })
+    // Initialize session
+    getInitialSession()
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('AuthProvider: Auth state changed:', _event, session)
-      setSession(session)
-      setUser(session?.user ?? null)
-      setIsLoggedIn(!!session)
-      setLoading(false)
-    })
+    // Listen for auth changes with profile handling
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (mounted) {
+          console.log('Auth state change:', event, session?.user?.email)
+          setSession(session)
+          setUser(session?.user ?? null)
+          
+          // Handle profile creation for new sessions
+          if (event === 'SIGNED_IN' && session?.user?.id) {
+            await fetchOrCreateProfile(session.user.id, session.user.email)
+          }
+          
+          setLoading(false)
+          setIsReady(true)
+        }
+      }
+    )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      mounted = false
+      subscription?.unsubscribe()
+    }
   }, [])
 
-  // Real Supabase authentication methods
-  const signUpWithOTP = async (email, metadata = {}) => {
-    console.log('AuthProvider: signUpWithOTP called', { email, metadata })
-    
+  // Sign up with OTP
+  const signUpWithOTP = async (email, userData = {}) => {
     try {
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          data: metadata,
-          shouldCreateUser: true
+          data: userData
         }
       })
-      
-      if (error) {
-        console.error('AuthProvider: signUpWithOTP error:', error)
-        setError(error.message)
-      }
-      
-      return { data, error }
-    } catch (err) {
-      console.error('AuthProvider: signUpWithOTP exception:', err)
-      return { data: null, error: err }
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      console.error('Sign up error:', error)
+      return { data: null, error }
     }
   }
 
-  const signInWithOTP = async (email) => {
-    console.log('AuthProvider: signInWithOTP called', { email })
-    
-    try {
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false
-        }
-      })
-      
-      if (error) {
-        console.error('AuthProvider: signInWithOTP error:', error)
-        setError(error.message)
-      }
-      
-      return { data, error }
-    } catch (err) {
-      console.error('AuthProvider: signInWithOTP exception:', err)
-      return { data: null, error: err }
-    }
-  }
-
-  const verifyOTP = async (email, token) => {
-    console.log('AuthProvider: verifyOTP called', { email, token })
-    
+  // Verify OTP with robust session handling and profile creation
+  const verifyOTP = async (email, token, userData = {}) => {
     try {
       const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
         type: 'email'
       })
-      
-      if (error) {
-        console.error('AuthProvider: verifyOTP error:', error)
-        setError(error.message)
-        return { data: null, error }
-      }
-      
-      // Update state
-      setUser(data.user)
-      setSession(data.session)
-      setIsLoggedIn(true)
-      setError(null)
-      
-      console.log('AuthProvider: OTP verification successful')
-      return { data, error: null }
-    } catch (err) {
-      console.error('AuthProvider: verifyOTP exception:', err)
-      return { data: null, error: err }
-    }
-  }
 
-  // Keep dummy OTP for testing - but use real user data
-  const verifyDummyOTP = async (code) => {
-    console.log("AuthProvider: Dummy OTP verification (accepts any 6 digits)")
-    
-    if (!code || code.length !== 6) {
-      return {
-        data: null,
-        error: { message: 'Please enter a valid 6-digit code' }
+      if (error) throw error
+
+      const session = data?.session ?? null
+      const user = session?.user ?? null
+
+      if (!user) {
+        throw new Error('No user returned after OTP verification')
       }
-    }
-    
-    // Note: This is still a dummy verification, but we'll get real user data from Supabase
-    console.log("AuthProvider: Using dummy OTP for development - should be replaced with real OTP verification")
-    
-    // Try to use real Supabase verification first
-    try {
-      // Get the email from sessionStorage or state (should be set during signup)
-      const pendingEmail = sessionStorage.getItem('pendingVerificationEmail')
-      
-      if (pendingEmail) {
-        // Try real OTP verification first
-        const realVerification = await verifyOTP(pendingEmail, code)
-        if (realVerification.data && !realVerification.error) {
-          // Clear pending email
-          sessionStorage.removeItem('pendingVerificationEmail')
-          return realVerification
+
+      // Wait for session to propagate
+      await new Promise(resolve => setTimeout(resolve, 400))
+
+      // Get fresh session from client
+      const { data: sessionRes } = await supabase.auth.getSession()
+      const currentUser = sessionRes?.session?.user ?? user
+
+      // Check if profile exists
+      const { data: profile, error: profileErr } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', currentUser.id)
+        .single()
+
+      // If profile doesn't exist, create it via server endpoint
+      if (profileErr && (profileErr.code === 'PGRST116' || profileErr.status === 404)) {
+        console.log('Profile not found, creating via server endpoint...')
+        
+        try {
+          const response = await fetch('/api/profile/create', {
+            method: 'POST',
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session?.access_token}`
+            },
+            body: JSON.stringify({
+              auth_id: currentUser.id,
+              email: currentUser.email,
+              first_name: userData.first_name || userData.firstName || null,
+              last_name: userData.last_name || userData.lastName || null,
+              usn: userData.usn || null,
+              branch: userData.branch || null,
+              branch_code: userData.branch_code || null,
+              admission_year: userData.admission_year || userData.joining_year || null,
+              passing_year: userData.passing_year || null
+            })
+          })
+
+          if (response.ok) {
+            console.log('Profile created successfully via server endpoint')
+          } else {
+            const errorData = await response.json()
+            console.warn('Server profile creation failed:', errorData)
+          }
+        } catch (serverError) {
+          console.warn('Server profile creation error:', serverError)
+          // Continue anyway - profile can be created later
         }
       }
+
+      return { data, error: null }
     } catch (error) {
-      console.log("AuthProvider: Real OTP verification failed, using dummy for development")
+      console.error('OTP verification error:', error)
+      return { data: null, error }
     }
-    
-    // Fallback to dummy for development only
-    const mockUser = {
-      id: 'test-user-' + Date.now(),
-      email: sessionStorage.getItem('pendingVerificationEmail') || 'test@sit.ac.in',
-      email_confirmed_at: new Date().toISOString(),
-      user_metadata: { 
-        verified: true, 
-        test_mode: true,
-        first_name: sessionStorage.getItem('pendingFirstName') || 'Test',
-        last_name: sessionStorage.getItem('pendingLastName') || 'User',
-        usn: sessionStorage.getItem('pendingUSN') || 'TEST123',
-        branch: sessionStorage.getItem('pendingBranch') || 'Computer Science',
-        joining_year: sessionStorage.getItem('pendingJoiningYear') || 2020,
-        passing_year: sessionStorage.getItem('pendingPassingYear') || 2024
-      }
-    }
-    
-    const mockSession = {
-      user: mockUser,
-      access_token: 'test-token',
-      refresh_token: 'test-refresh',
-      expires_at: Date.now() + (24 * 60 * 60 * 1000)
-    }
-    
-    setUser(mockUser)
-    setSession(mockSession)
-    setIsLoggedIn(true)
-    
-    // Clear all pending data
-    sessionStorage.removeItem('pendingFirstName')
-    sessionStorage.removeItem('pendingLastName')
-    sessionStorage.removeItem('pendingUSN')
-    sessionStorage.removeItem('pendingBranch')
-    sessionStorage.removeItem('pendingJoiningYear')
-    sessionStorage.removeItem('pendingPassingYear')
-    
-    return { data: { user: mockUser, session: mockSession }, error: null }
   }
 
+  // Sign up with password
+  const signUpWithPassword = async (email, password, userData = {}) => {
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: userData
+        }
+      })
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      console.error('Sign up with password error:', error)
+      return { data: null, error }
+    }
+  }
+
+  // Sign in with password
+  const signInWithPassword = async (email, password) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      })
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      console.error('Sign in with password error:', error)
+      return { data: null, error }
+    }
+  }
+
+  // Reset password
+  const resetPassword = async (email) => {
+    try {
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      })
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      console.error('Reset password error:', error)
+      return { data: null, error }
+    }
+  }
+
+  // Update password
+  const updatePassword = async (password) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser({
+        password
+      })
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      console.error('Update password error:', error)
+      return { data: null, error }
+    }
+  }
+
+  // Sign out
   const signOut = async () => {
-    console.log("AuthProvider: Signing out...")
-    
     try {
       const { error } = await supabase.auth.signOut()
+      if (error) throw error
       
-      if (error) {
-        console.error('AuthProvider: signOut error:', error)
-        return { error }
-      }
-      
-      // Clear state
-      setUser(null)
       setSession(null)
-      setIsLoggedIn(false)
-      setError(null)
-      
-      console.log("AuthProvider: Sign out complete")
+      setUser(null)
       return { error: null }
-    } catch (err) {
-      console.error('AuthProvider: signOut exception:', err)
-      return { error: err }
-    }
-  }
-
-  const getSession = async () => {
-    console.log("AuthProvider: getSession called")
-    try {
-      const { data: { session }, error } = await supabase.auth.getSession()
-      return { session, error }
-    } catch (err) {
-      return { session: null, error: err }
+    } catch (error) {
+      console.error('Sign out error:', error)
+      return { error }
     }
   }
 
@@ -237,24 +350,15 @@ export function AuthProvider({ children }) {
     user,
     session,
     loading,
-    error,
-    isLoggedIn,
+    isReady,
     signUpWithOTP,
-    signInWithOTP,
     verifyOTP,
-    verifyDummyOTP,
-    signOut,
-    getSession,
-    isReady
+    signUpWithPassword,
+    signInWithPassword,
+    resetPassword,
+    updatePassword,
+    signOut
   }
-
-  console.log('AuthProvider: Providing context value:', { 
-    hasUser: !!user, 
-    hasSession: !!session, 
-    loading, 
-    isLoggedIn, 
-    isReady 
-  })
 
   return (
     <AuthContext.Provider value={value}>

@@ -2,8 +2,14 @@
 import { useState } from "react"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
+import { useJobs } from "../../hooks/useRealTime"
+import { useUser } from "../../contexts/UserContext"
 
 const JobPostModal = ({ onClose, onSubmit }) => {
+  const { createJob } = useJobs()
+  const { getFullName } = useUser()
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  
   const [formData, setFormData] = useState({
     title: "",
     company: "",
@@ -16,13 +22,40 @@ const JobPostModal = ({ onClose, onSubmit }) => {
     isRemote: false,
   })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const jobData = {
-      ...formData,
-      skills: formData.skills.split(",").map((skill) => skill.trim()),
+    
+    setIsSubmitting(true)
+
+    try {
+      const jobData = {
+        title: formData.title,
+        company: formData.company,
+        location: formData.location,
+        job_type: formData.type,
+        experience_required: formData.experience,
+        salary_range: formData.salary || null,
+        description: formData.description,
+        skills_required: formData.skills.split(",").map((skill) => skill.trim()).filter(skill => skill),
+        is_remote: formData.isRemote,
+        application_deadline: null, // Could be added to form later
+        job_status: 'active'
+      }
+
+      const newJob = await createJob(jobData)
+
+      // Call parent onSubmit callback if provided
+      if (onSubmit && newJob) {
+        onSubmit(newJob)
+      }
+
+      onClose()
+    } catch (error) {
+      console.error('Failed to create job:', error)
+      // Error is already handled in the useJobs hook
+    } finally {
+      setIsSubmitting(false)
     }
-    onSubmit(jobData)
   }
 
   const handleChange = (key, value) => {
@@ -161,8 +194,12 @@ const JobPostModal = ({ onClose, onSubmit }) => {
               <Button type="button" onClick={onClose} className="bg-gray-600 hover:bg-gray-700 text-white">
                 Cancel
               </Button>
-              <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                Post Job
+              <Button 
+                type="submit" 
+                disabled={isSubmitting}
+                className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50"
+              >
+                {isSubmitting ? "Posting Job..." : "Post Job"}
               </Button>
             </div>
           </form>

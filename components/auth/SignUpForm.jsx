@@ -20,6 +20,7 @@ export default function SignUpForm({ onStepChange }) {
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [extractedData, setExtractedData] = useState(null)
+  const [emailTouched, setEmailTouched] = useState(false)
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [submitCooldown, setSubmitCooldown] = useState(0)
@@ -34,28 +35,56 @@ export default function SignUpForm({ onStepChange }) {
     }
   }, [submitCooldown])
 
-  // Auto-extract data when email changes
+  // Debounced email parsing/validation to prevent console spam
   useEffect(() => {
-    if (formData.email && formData.email.includes('@')) {
-      try {
-        const parsed = parseInstitutionalEmail(formData.email)
-        setExtractedData(parsed)
-        setErrors(prev => ({ ...prev, email: "" }))
-      } catch (error) {
-        setExtractedData(null)
-        if (formData.email.includes('@sit.ac.in')) {
-          setErrors(prev => ({ ...prev, email: error.message }))
-        }
-      }
-    } else {
+    const email = (formData.email || '').trim().toLowerCase()
+    if (!email) {
       setExtractedData(null)
+      return
     }
-  }, [formData.email])
+
+    const id = setTimeout(() => {
+      if (email.endsWith('@sit.ac.in')) {
+        const parsed = parseInstitutionalEmail(email)
+        if (parsed?.isValid) {
+          setExtractedData(parsed)
+          setErrors(prev => ({ ...prev, email: "" }))
+        } else if (emailTouched) {
+          setExtractedData(null)
+          setErrors(prev => ({ ...prev, email: parsed?.error || 'Invalid institutional email' }))
+        }
+      } else if (emailTouched) {
+        setExtractedData(null)
+        setErrors(prev => ({ ...prev, email: 'Please use your SIT institutional email (@sit.ac.in)' }))
+      }
+    }, 350)
+
+    return () => clearTimeout(id)
+  }, [formData.email, emailTouched])
 
   const handleInputChange = (field, value) => {
     setFormData(prev => ({ ...prev, [field]: value }))
     if (errors[field]) {
       setErrors(prev => ({ ...prev, [field]: "" }))
+    }
+  }
+
+  const handleEmailBlur = () => {
+    setEmailTouched(true)
+    const email = (formData.email || '').trim().toLowerCase()
+    if (!email) return
+    if (email.endsWith('@sit.ac.in')) {
+      const parsed = parseInstitutionalEmail(email)
+      if (parsed?.isValid) {
+        setExtractedData(parsed)
+        setErrors(prev => ({ ...prev, email: "" }))
+      } else {
+        setExtractedData(null)
+        setErrors(prev => ({ ...prev, email: parsed?.error || 'Invalid institutional email' }))
+      }
+    } else {
+      setExtractedData(null)
+      setErrors(prev => ({ ...prev, email: 'Please use your SIT institutional email (@sit.ac.in)' }))
     }
   }
 
@@ -148,7 +177,7 @@ export default function SignUpForm({ onStepChange }) {
         
         if (error.message?.includes('already registered')) {
           setErrors({ email: "This email is already registered. Try signing in instead." })
-        } else if (error.message?.includes('rate limit')) {
+        } else if (error.status === 429 || /rate limit|Too Many Requests/i.test(error.message || '')) {
           setErrors({ submit: "Too many attempts. Please wait before trying again." })
           setSubmitCooldown(60)
         } else {
@@ -169,6 +198,9 @@ export default function SignUpForm({ onStepChange }) {
         sessionStorage.setItem('pendingJoiningYear', extractedData.joiningYear || '')
         sessionStorage.setItem('pendingPassingYear', extractedData.passingYear || '')
       }
+
+      // Start a short cooldown to avoid rate limiting on repeated clicks
+      setSubmitCooldown(18)
 
       // Move to OTP verification step
       onStepChange('otp-verification', {
@@ -250,6 +282,7 @@ export default function SignUpForm({ onStepChange }) {
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleInputChange('email', e.target.value)}
+                onBlur={handleEmailBlur}
                 className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2]"
                 placeholder="1si23cs001@sit.ac.in"
                 disabled={isLoading}

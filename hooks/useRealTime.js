@@ -10,6 +10,7 @@ import { mockAPI } from '../lib/mockAPI'
 import * as postsAPI from '../lib/api/posts'
 import * as jobsAPI from '../lib/api/jobs'
 import * as eventsAPI from '../lib/api/events'
+import * as alumniAPI from '../lib/api/alumni'
 
 // Custom hook for real-time alumni data
 export function useAlumni() {
@@ -19,10 +20,22 @@ export function useAlumni() {
   const loadAlumni = useCallback(async (filters = {}) => {
     dispatch({ type: actionTypes.SET_ALUMNI_LOADING, payload: true })
     try {
-      const response = await mockAPI.getAlumni(filters)
-      dispatch({ type: actionTypes.SET_ALUMNI, payload: response.data })
+      const { data, error } = await alumniAPI.fetchAlumniDirectory(filters)
+      if (error) throw new Error(error)
+      
+      // Transform the API response to match the expected format
+      const transformedData = {
+        alumni: data.alumni || [],
+        pagination: data.pagination || {},
+        filters: data.filters || {}
+      }
+      
+      dispatch({ type: actionTypes.SET_ALUMNI, payload: transformedData })
     } catch (error) {
+      console.error('Error loading alumni:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
+    } finally {
+      dispatch({ type: actionTypes.SET_ALUMNI_LOADING, payload: false })
     }
   }, [dispatch, actionTypes])
 
@@ -32,8 +45,10 @@ export function useAlumni() {
 
   const connectWithAlumni = useCallback(async (alumniId) => {
     try {
-      const response = await mockAPI.connectWithAlumni(alumniId)
-      dispatch({ type: actionTypes.ADD_CONNECTION, payload: response.data })
+      const { data, error } = await alumniAPI.connectWithAlumni(alumniId)
+      if (error) throw new Error(error)
+      
+      dispatch({ type: actionTypes.ADD_CONNECTION, payload: { id: alumniId } })
       
       // Show success notification
       dispatch({ 
@@ -42,7 +57,7 @@ export function useAlumni() {
           id: Date.now(),
           type: 'success',
           title: 'Connection Request Sent',
-          message: `Connected with ${response.data.name}`,
+          message: data.message || 'Connection request sent successfully',
           timestamp: new Date().toISOString(),
           read: false
         }
@@ -53,12 +68,22 @@ export function useAlumni() {
         type: actionTypes.SET_TOAST,
         payload: {
           type: 'success',
-          message: `Successfully connected with ${response.data.name}!`
+          message: data.message || 'Connection request sent successfully!'
         }
       })
       
     } catch (error) {
+      console.error('Error connecting with alumni:', error)
       dispatch({ type: actionTypes.SET_ERROR, payload: error.message })
+      
+      // Show error toast
+      dispatch({
+        type: actionTypes.SET_TOAST,
+        payload: {
+          type: 'error',
+          message: error.message || 'Failed to send connection request'
+        }
+      })
     }
   }, [dispatch, actionTypes])
 

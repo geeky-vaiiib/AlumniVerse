@@ -1,118 +1,36 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { debounce } from "../../lib/utils"
 import DirectorySidebar from "./DirectorySidebar"
 import AlumniGrid from "./AlumniGrid"
 import Pagination from "./Pagination"
+import { useAlumni } from "../../hooks/useRealTime"
 
-// Mock data for demonstration
-const mockAlumni = [
-  {
-    id: 1,
-    name: "Priya Sharma",
-    batch: "2020",
-    branch: "Computer Science",
-    company: "Google",
-    designation: "Software Engineer",
-    location: "Bangalore, India",
-    skills: ["React", "Node.js", "Python", "Machine Learning"],
-    linkedinUrl: "https://linkedin.com/in/priya-sharma",
-    githubUrl: "https://github.com/priya-sharma",
-    avatar: "PS",
-    isConnected: false,
-    connectionCount: 156,
-  },
-  {
-    id: 2,
-    name: "Rahul Kumar",
-    batch: "2018",
-    branch: "Information Science",
-    company: "Microsoft",
-    designation: "Product Manager",
-    location: "Seattle, USA",
-    skills: ["Product Management", "Data Analysis", "SQL", "Azure"],
-    linkedinUrl: "https://linkedin.com/in/rahul-kumar",
-    githubUrl: "https://github.com/rahul-kumar",
-    avatar: "RK",
-    isConnected: true,
-    connectionCount: 234,
-  },
-  {
-    id: 3,
-    name: "Anita Patel",
-    batch: "2019",
-    branch: "Computer Science",
-    company: "TechStart Inc.",
-    designation: "Founder & CEO",
-    location: "Mumbai, India",
-    skills: ["Entrepreneurship", "Leadership", "Full Stack", "AI/ML"],
-    linkedinUrl: "https://linkedin.com/in/anita-patel",
-    githubUrl: "https://github.com/anita-patel",
-    avatar: "AP",
-    isConnected: false,
-    connectionCount: 89,
-  },
-  {
-    id: 4,
-    name: "Vikram Singh",
-    batch: "2017",
-    branch: "Electronics",
-    company: "Tesla",
-    designation: "Hardware Engineer",
-    location: "Austin, USA",
-    skills: ["Hardware Design", "Embedded Systems", "IoT", "Automotive"],
-    linkedinUrl: "https://linkedin.com/in/vikram-singh",
-    githubUrl: "https://github.com/vikram-singh",
-    avatar: "VS",
-    isConnected: false,
-    connectionCount: 178,
-  },
-  {
-    id: 5,
-    name: "Sneha Reddy",
-    batch: "2021",
-    branch: "Information Science",
-    company: "Amazon",
-    designation: "SDE-1",
-    location: "Hyderabad, India",
-    skills: ["Java", "AWS", "Microservices", "System Design"],
-    linkedinUrl: "https://linkedin.com/in/sneha-reddy",
-    githubUrl: "https://github.com/sneha-reddy",
-    avatar: "SR",
-    isConnected: true,
-    connectionCount: 67,
-  },
-  {
-    id: 6,
-    name: "Arjun Mehta",
-    batch: "2016",
-    branch: "Mechanical",
-    company: "SpaceX",
-    designation: "Aerospace Engineer",
-    location: "Los Angeles, USA",
-    skills: ["Aerospace Engineering", "CAD", "Simulation", "Manufacturing"],
-    linkedinUrl: "https://linkedin.com/in/arjun-mehta",
-    githubUrl: "https://github.com/arjun-mehta",
-    avatar: "AM",
-    isConnected: false,
-    connectionCount: 145,
-  },
-]
 
 export default function AlumniDirectory() {
-  const [alumni, setAlumni] = useState(mockAlumni)
-  const [filteredAlumni, setFilteredAlumni] = useState(mockAlumni)
+  const { 
+    alumni: alumniData, 
+    alumniLoading, 
+    loadAlumni, 
+    updateFilters: updateAlumniFilters, 
+    connectWithAlumni 
+  } = useAlumni()
+  
   const [filters, setFilters] = useState({
     search: "",
     branch: "",
     yearRange: [2010, 2024],
     location: "",
     skills: [],
+    page: 1,
+    limit: 6
   })
-  const [currentPage, setCurrentPage] = useState(1)
-  const [isLoading, setIsLoading] = useState(false)
-  const itemsPerPage = 6
+  
+  // Extract data from the alumni hook
+  const alumni = alumniData?.alumni || []
+  const pagination = alumniData?.pagination || {}
+  const isLoading = alumniLoading
 
   // Debounced search function
   const debouncedSearch = debounce((searchTerm, currentFilters) => {
@@ -120,53 +38,23 @@ export default function AlumniDirectory() {
   }, 300)
 
   const applyFilters = (searchTerm = filters.search, currentFilters = filters) => {
-    setIsLoading(true)
-
-    let filtered = [...alumni]
-
-    // Search filter
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (person) =>
-          person.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          person.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          person.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          person.skills.some((skill) => skill.toLowerCase().includes(searchTerm.toLowerCase())),
-      )
+    // Transform filters to API format
+    const apiFilters = {
+      search: searchTerm,
+      branch: currentFilters.branch,
+      location: currentFilters.location,
+      skills: Array.isArray(currentFilters.skills) ? currentFilters.skills.join(',') : currentFilters.skills,
+      page: currentFilters.page || 1,
+      limit: currentFilters.limit || 6
     }
 
-    // Branch filter
-    if (currentFilters.branch) {
-      filtered = filtered.filter((person) => person.branch === currentFilters.branch)
+    // Add year range filter (use the end year for now, could be enhanced)
+    if (currentFilters.yearRange && currentFilters.yearRange[1] !== 2024) {
+      apiFilters.year = currentFilters.yearRange[1]
     }
 
-    // Year range filter
-    filtered = filtered.filter((person) => {
-      const year = Number.parseInt(person.batch)
-      return year >= currentFilters.yearRange[0] && year <= currentFilters.yearRange[1]
-    })
-
-    // Location filter
-    if (currentFilters.location) {
-      filtered = filtered.filter((person) =>
-        person.location.toLowerCase().includes(currentFilters.location.toLowerCase()),
-      )
-    }
-
-    // Skills filter
-    if (currentFilters.skills.length > 0) {
-      filtered = filtered.filter((person) =>
-        currentFilters.skills.some((skill) =>
-          person.skills.some((personSkill) => personSkill.toLowerCase().includes(skill.toLowerCase())),
-        ),
-      )
-    }
-
-    setTimeout(() => {
-      setFilteredAlumni(filtered)
-      setCurrentPage(1)
-      setIsLoading(false)
-    }, 300)
+    // Update the alumni filters which will trigger a reload
+    updateAlumniFilters(apiFilters)
   }
 
   const handleFilterChange = (newFilters) => {
@@ -179,18 +67,19 @@ export default function AlumniDirectory() {
   }
 
   const handleConnect = (alumniId) => {
-    setAlumni((prev) =>
-      prev.map((person) => (person.id === alumniId ? { ...person, isConnected: !person.isConnected } : person)),
-    )
-    setFilteredAlumni((prev) =>
-      prev.map((person) => (person.id === alumniId ? { ...person, isConnected: !person.isConnected } : person)),
-    )
+    connectWithAlumni(alumniId)
   }
 
-  // Pagination
-  const totalPages = Math.ceil(filteredAlumni.length / itemsPerPage)
-  const startIndex = (currentPage - 1) * itemsPerPage
-  const paginatedAlumni = filteredAlumni.slice(startIndex, startIndex + itemsPerPage)
+  const handlePageChange = (newPage) => {
+    const newFilters = { ...filters, page: newPage }
+    setFilters(newFilters)
+    applyFilters(newFilters.search, newFilters)
+  }
+
+  // Use API pagination data
+  const totalPages = pagination.totalPages || 1
+  const currentPage = pagination.currentPage || 1
+  const totalCount = pagination.totalCount || 0
 
   return (
     <div className="min-h-screen bg-background">
@@ -201,11 +90,11 @@ export default function AlumniDirectory() {
             <div>
               <h1 className="text-3xl font-bold text-foreground">Alumni Directory</h1>
               <p className="text-foreground-muted mt-1">
-                Connect with {filteredAlumni.length} alumni from your network
+                Connect with {totalCount} alumni from your network
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-primary">{filteredAlumni.length}</div>
+              <div className="text-2xl font-bold text-primary">{totalCount}</div>
               <div className="text-sm text-foreground-muted">Alumni Found</div>
             </div>
           </div>
@@ -219,18 +108,18 @@ export default function AlumniDirectory() {
             <DirectorySidebar
               filters={filters}
               onFilterChange={handleFilterChange}
-              totalResults={filteredAlumni.length}
+              totalResults={totalCount}
             />
           </div>
 
           {/* Main content */}
           <div className="flex-1">
-            <AlumniGrid alumni={paginatedAlumni} isLoading={isLoading} onConnect={handleConnect} />
+            <AlumniGrid alumni={alumni} isLoading={isLoading} onConnect={handleConnect} />
 
             {/* Pagination */}
             {totalPages > 1 && (
               <div className="mt-8">
-                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
               </div>
             )}
           </div>

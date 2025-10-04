@@ -4,7 +4,12 @@ import { Suspense } from 'react'
 import AuthFlow from '../../components/auth/AuthFlow'
 
 function LoginContent() {
-  return <AuthFlow initialStep="login" />
+  return (
+    <div className="min-h-screen bg-background">
+      {/* No Navbar on login page as per requirements */}
+      <AuthFlow initialStep="login" />
+    </div>
+  )
 }
 
 export default function LoginPage() {

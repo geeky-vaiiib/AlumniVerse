@@ -7,20 +7,42 @@ import { generateAvatar } from "../../lib/utils"
 
 export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
   const [isConnecting, setIsConnecting] = useState(false)
-  const avatar = generateAvatar(alumni.name)
+  
+  // Transform API data to component format
+  const transformedAlumni = {
+    id: alumni.id,
+    name: alumni.fullName || `${alumni.first_name || ''} ${alumni.last_name || ''}`.trim(),
+    designation: alumni.current_position || alumni.designation || 'N/A',
+    company: alumni.company || 'N/A',
+    branch: alumni.branch || 'N/A',
+    batch: alumni.graduationYear || alumni.passing_year || alumni.batch || 'N/A',
+    location: alumni.location || 'N/A',
+    skills: alumni.skills || [],
+    connectionCount: alumni.connectionCount || 0,
+    isConnected: alumni.isConnected || false,
+    linkedinUrl: alumni.linkedin_url || alumni.linkedinUrl || alumni.social_links?.linkedin,
+    githubUrl: alumni.github_url || alumni.githubUrl || alumni.social_links?.github,
+    avatar: alumni.avatar || null,
+    profilePictureUrl: alumni.profilePictureUrl || alumni.profile_picture_url
+  }
+  
+  const avatar = generateAvatar(transformedAlumni.name)
 
   const handleConnect = async () => {
     setIsConnecting(true)
-    // Simulate API call
-    setTimeout(() => {
-      onConnect(alumni.id)
+    try {
+      await onConnect(transformedAlumni.id)
+    } catch (error) {
+      console.error('Error connecting:', error)
+    } finally {
       setIsConnecting(false)
-    }, 1000)
+    }
   }
 
   const handleViewProfile = () => {
     // Navigate to detailed profile view
-    console.log("View profile:", alumni.id)
+    console.log("View profile:", transformedAlumni.id)
+    // TODO: Implement navigation to profile page
   }
 
   return (
@@ -32,19 +54,27 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
         {/* Header */}
         <div className="flex items-center space-x-4 mb-4">
           <div
-            className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg"
+            className="w-16 h-16 rounded-full flex items-center justify-center text-white font-bold text-lg overflow-hidden"
             style={{ backgroundColor: avatar.backgroundColor }}
           >
-            {alumni.avatar || avatar.initials}
+            {transformedAlumni.profilePictureUrl ? (
+              <img 
+                src={transformedAlumni.profilePictureUrl} 
+                alt={transformedAlumni.name}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              transformedAlumni.avatar || avatar.initials
+            )}
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-foreground text-lg truncate">{alumni.name}</h3>
+            <h3 className="font-semibold text-foreground text-lg truncate">{transformedAlumni.name}</h3>
             <p className="text-foreground-muted text-sm">
-              {alumni.designation} at {alumni.company}
+              {transformedAlumni.designation} at {transformedAlumni.company}
             </p>
             <div className="flex items-center space-x-2 mt-1">
-              <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded">{alumni.branch}</span>
-              <span className="text-xs text-foreground-muted">Class of {alumni.batch}</span>
+              <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded">{transformedAlumni.branch}</span>
+              <span className="text-xs text-foreground-muted">Class of {transformedAlumni.batch}</span>
             </div>
           </div>
         </div>
@@ -52,20 +82,20 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
         {/* Location */}
         <div className="flex items-center text-foreground-muted text-sm mb-4">
           <span className="mr-1">📍</span>
-          {alumni.location}
+          {transformedAlumni.location}
         </div>
 
         {/* Skills */}
         <div className="mb-4">
           <div className="text-xs text-foreground-muted mb-2">Skills:</div>
           <div className="flex flex-wrap gap-1">
-            {alumni.skills.slice(0, 4).map((skill, index) => (
+            {transformedAlumni.skills.slice(0, 4).map((skill, index) => (
               <span key={index} className="px-2 py-1 text-xs bg-surface text-foreground-muted rounded border">
                 {skill}
               </span>
             ))}
-            {alumni.skills.length > 4 && (
-              <span className="px-2 py-1 text-xs text-primary">+{alumni.skills.length - 4} more</span>
+            {transformedAlumni.skills.length > 4 && (
+              <span className="px-2 py-1 text-xs text-primary">+{transformedAlumni.skills.length - 4} more</span>
             )}
           </div>
         </div>
@@ -73,7 +103,7 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
         {/* Connection count */}
         <div className="flex items-center text-foreground-muted text-sm mb-4">
           <span className="mr-1">🤝</span>
-          {alumni.connectionCount} connections
+          {transformedAlumni.connectionCount} connections
         </div>
 
         {/* Actions */}
@@ -81,10 +111,10 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
           <Button
             onClick={handleConnect}
             disabled={isConnecting}
-            className={`flex-1 ${alumni.isConnected ? "bg-success hover:bg-success/80" : "hover-glow"}`}
-            variant={alumni.isConnected ? "secondary" : "default"}
+            className={`flex-1 ${transformedAlumni.isConnected ? "bg-success hover:bg-success/80" : "hover-glow"}`}
+            variant={transformedAlumni.isConnected ? "secondary" : "default"}
           >
-            {isConnecting ? "Connecting..." : alumni.isConnected ? "Connected" : "Connect"}
+            {isConnecting ? "Connecting..." : transformedAlumni.isConnected ? "Connected" : "Connect"}
           </Button>
           <Button variant="outline" size="sm" onClick={handleViewProfile} className="px-3 bg-transparent">
             View
@@ -93,9 +123,9 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
 
         {/* Social Links */}
         <div className="flex justify-center space-x-4 mt-4 pt-4 border-t border-border-subtle">
-          {alumni.linkedinUrl && (
+          {transformedAlumni.linkedinUrl && (
             <a
-              href={alumni.linkedinUrl}
+              href={transformedAlumni.linkedinUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-foreground-muted hover:text-primary transition-colors"
@@ -110,9 +140,9 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
               </svg>
             </a>
           )}
-          {alumni.githubUrl && (
+          {transformedAlumni.githubUrl && (
             <a
-              href={alumni.githubUrl}
+              href={transformedAlumni.githubUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="text-foreground-muted hover:text-primary transition-colors"

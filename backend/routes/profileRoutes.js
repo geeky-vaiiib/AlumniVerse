@@ -216,22 +216,30 @@ router.put('/update', authenticateToken, profileValidation, catchAsync(async (re
   );
 
   if (isProfileComplete) {
-    updateData.is_profile_complete = true;
+    updateData.profile_completed = true;
   }
 
   updateData.updated_at = new Date().toISOString();
 
-  // Update user in database
-  const { data: updatedUser, error } = await supabaseAdmin
+  // Update user in database (avoid .single() to prevent 406 when duplicates exist)
+  const { data: updatedRows, error } = await supabaseAdmin
     .from('users')
     .update(updateData)
     .eq('auth_id', req.user.authId)
-    .select()
-    .single();
+    .select();
 
   if (error) {
     console.error('Profile update error:', error);
     return next(new AppError('Failed to update profile', 500));
+  }
+
+  // Pick the most recent updated row if multiple were affected
+  const updatedUser = Array.isArray(updatedRows) && updatedRows.length
+    ? updatedRows.sort((a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0))[0]
+    : updatedRows;
+
+  if (!updatedUser) {
+    return next(new AppError('Profile update returned no rows', 500));
   }
 
   // Remove sensitive data from response
@@ -242,8 +250,63 @@ router.put('/update', authenticateToken, profileValidation, catchAsync(async (re
     message: 'Profile updated successfully',
     data: {
       user: userResponse,
-      isProfileComplete: updatedUser.is_profile_complete
+      isProfileComplete: updatedUser.profile_completed
     }
+  });
+}));
+
+/**
+ * @route   POST /api/profile/create
+ * @desc    Create user profile (service role - bypasses RLS)
+ * @access  Server-side only
+ */
+router.post('/create', catchAsync(async (req, res, next) => {
+  const { auth_id, email, first_name, last_name, usn, branch, branch_code, admission_year, passing_year } = req.body;
+  
+  if (!auth_id || !email) {
+    return next(new AppError('auth_id and email are required', 400));
+  }
+
+  // Use service role to bypass RLS for initial profile creation
+  const { data, error } = await supabaseAdmin
+    .from('users')
+    .insert({
+      auth_id,
+      email,
+      first_name: first_name || null,
+      last_name: last_name || null,
+      usn: usn || null,
+      branch: branch || null,
+      branch_code: branch_code || null,
+      admission_year: admission_year || null,
+      passing_year: passing_year || null,
+      is_email_verified: true,
+      profile_completed: false,
+      password_hash: null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Profile creation error:', error);
+    if (error.code === '23505') { // Unique constraint violation
+      return res.status(409).json({ 
+        success: false, 
+        error: 'Profile already exists for this user' 
+      });
+    }
+    return next(new AppError('Failed to create profile', 500));
+  }
+
+  // Remove sensitive data
+  const { password_hash, ...profileData } = data;
+
+  res.status(201).json({
+    success: true,
+    message: 'Profile created successfully',
+    data: profileData
   });
 }));
 
@@ -258,13 +321,22 @@ router.get('/me', authenticateToken, catchAsync(async (req, res, next) => {
     return next(new AppError('User not authenticated', 401));
   }
 
-  const { data: user, error } = await supabaseAdmin
+  // Avoid .single() to prevent 406 when duplicates exist; choose latest
+  const { data: rows, error } = await supabaseAdmin
     .from('users')
     .select('*')
     .eq('auth_id', userId)
-    .single();
+    .order('updated_at', { ascending: false, nullsLast: true })
+    .limit(1);
 
-  if (error || !user) {
+  if (error) {
+    console.error('Profile fetch error:', error);
+    return next(new AppError('User profile not found', 404));
+  }
+
+  const user = Array.isArray(rows) ? rows[0] : rows;
+
+  if (!user) {
     return next(new AppError('User profile not found', 404));
   }
 

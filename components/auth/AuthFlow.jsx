@@ -6,8 +6,10 @@ import LoginForm from "./LoginForm"
 import SignUpForm from "./SignUpForm"
 import OTPVerification from "./OTPVerification"
 import ProfileCreationFlow from "./ProfileCreationFlow"
+import ForgotPassword from "./ForgotPassword"
 import { useAuth } from "../providers/AuthProvider"
 import { useUser } from "../../contexts/UserContext"
+import { useToast } from "../../hooks/use-toast"
 
 export default function AuthFlow({ initialStep = 'login' }) {
   const router = useRouter()
@@ -15,6 +17,7 @@ export default function AuthFlow({ initialStep = 'login' }) {
   const { updateProfile } = useUser()
   const [currentStep, setCurrentStep] = useState(initialStep)
   const [authData, setAuthData] = useState({})
+  const { toast } = useToast()
 
   console.log('AuthFlow: Rendering with state -', {
     loading,
@@ -76,8 +79,12 @@ export default function AuthFlow({ initialStep = 'login' }) {
       router.push('/dashboard')
     } catch (error) {
       console.error('Error saving profile:', error)
-      // Still redirect to dashboard even if there's an error
-      router.push('/dashboard')
+      // Show error and stay on the profile page to allow retry
+      toast({
+        title: 'Failed to save profile',
+        description: (error?.message || 'Please try again.'),
+        variant: 'destructive'
+      })
     }
   }
 
@@ -119,6 +126,14 @@ export default function AuthFlow({ initialStep = 'login' }) {
             onComplete={handleProfileComplete}
           />
         </div>
+      )
+
+    case 'forgot-password':
+      return (
+        <ForgotPassword
+          onStepChange={handleStepChange}
+          initialEmail={authData.email}
+        />
       )
 
     default:

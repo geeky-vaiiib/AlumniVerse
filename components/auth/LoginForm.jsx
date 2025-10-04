@@ -4,15 +4,18 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { GraduationCap, Mail } from "lucide-react"
+import { GraduationCap, Mail, Lock, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "../providers/AuthProvider"
 
 export default function LoginForm({ onStepChange }) {
-  const { signInWithOTP, isReady } = useAuth()
+  const { signInWithPassword, signInWithOTP, isReady } = useAuth()
   const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [submitCooldown, setSubmitCooldown] = useState(0)
+  const [loginMethod, setLoginMethod] = useState("password") // "password" or "otp"
 
   // Cooldown timer effect
   useEffect(() => {
@@ -24,14 +27,19 @@ export default function LoginForm({ onStepChange }) {
     }
   }, [submitCooldown])
 
-  const handleInputChange = (value) => {
-    setEmail(value)
+  const handleInputChange = (field, value) => {
+    if (field === 'email') {
+      setEmail(value)
+    } else if (field === 'password') {
+      setPassword(value)
+    }
+    
     if (error) {
       setError("")
     }
   }
 
-  const validateEmail = () => {
+  const validateForm = () => {
     if (!email.trim()) {
       setError("Email is required")
       return false
@@ -48,6 +56,11 @@ export default function LoginForm({ onStepChange }) {
       return false
     }
 
+    if (loginMethod === "password" && !password.trim()) {
+      setError("Password is required")
+      return false
+    }
+
     return true
   }
 
@@ -60,49 +73,79 @@ export default function LoginForm({ onStepChange }) {
       return
     }
 
-    if (!validateEmail()) return
+    if (!validateForm()) return
 
     setIsLoading(true)
     setError("")
 
     try {
-      console.log('Sending login OTP to:', email)
-
       // Check if auth service is ready
       if (!isReady) {
         setError("Authentication service is not available. Please try again.")
         return
       }
 
-      // Send OTP using Supabase Auth
-      const { data, error: authError } = await signInWithOTP(
-        email.trim().toLowerCase()
-      )
-
-      if (authError) {
-        console.error('Login error:', authError)
+      if (loginMethod === "password") {
+        console.log('Signing in with password for:', email)
         
-        if (authError.message?.includes('not found') || authError.message?.includes('invalid')) {
-          setError("No account found with this email. Please sign up first.")
-        } else if (authError.message?.includes('rate limit')) {
-          setError("Too many attempts. Please wait before trying again.")
-          setSubmitCooldown(60)
-        } else {
-          setError(authError.message || "Failed to send verification code")
+        // Sign in with email and password
+        const { data, error: authError } = await signInWithPassword(
+          email.trim().toLowerCase(),
+          password
+        )
+
+        if (authError) {
+          console.error('Password login error:', authError)
+          
+          if (authError.message?.includes('Invalid login credentials')) {
+            setError("Invalid email or password. Please check your credentials.")
+          } else if (authError.message?.includes('Email not confirmed')) {
+            setError("Please verify your email address first.")
+          } else if (authError.message?.includes('rate limit')) {
+            setError("Too many attempts. Please wait before trying again.")
+            setSubmitCooldown(60)
+          } else {
+            setError(authError.message || "Login failed")
+          }
+          return
         }
-        return
+
+        console.log('Password login successful:', data)
+        // AuthProvider will handle the redirect via useEffect in AuthFlow
+
+      } else {
+        console.log('Sending login OTP to:', email)
+
+        // Send OTP using Supabase Auth
+        const { data, error: authError } = await signInWithOTP(
+          email.trim().toLowerCase()
+        )
+
+        if (authError) {
+          console.error('OTP login error:', authError)
+          
+          if (authError.message?.includes('not found') || authError.message?.includes('invalid')) {
+            setError("No account found with this email. Please sign up first.")
+          } else if (authError.message?.includes('rate limit')) {
+            setError("Too many attempts. Please wait before trying again.")
+            setSubmitCooldown(60)
+          } else {
+            setError(authError.message || "Failed to send verification code")
+          }
+          return
+        }
+
+        console.log('Login OTP sent successfully:', data)
+
+        // Store email for OTP verification
+        sessionStorage.setItem('pendingVerificationEmail', email.trim().toLowerCase())
+
+        // Move to OTP verification step
+        onStepChange('otp-verification', {
+          email: email.trim().toLowerCase(),
+          isSignUp: false
+        })
       }
-
-      console.log('Login OTP sent successfully:', data)
-
-      // Store email for OTP verification
-      sessionStorage.setItem('pendingVerificationEmail', email.trim().toLowerCase())
-
-      // Move to OTP verification step
-      onStepChange('otp-verification', {
-        email: email.trim().toLowerCase(),
-        isSignUp: false
-      })
 
     } catch (error) {
       console.error('Unexpected error:', error)
@@ -128,6 +171,32 @@ export default function LoginForm({ onStepChange }) {
         </CardHeader>
 
         <CardContent className="space-y-6">
+          {/* Login Method Toggle */}
+          <div className="flex bg-[#404040] rounded-lg p-1">
+            <button
+              type="button"
+              onClick={() => setLoginMethod("password")}
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                loginMethod === "password"
+                  ? "bg-[#4A90E2] text-white"
+                  : "text-[#B0B0B0] hover:text-white"
+              }`}
+            >
+              Password
+            </button>
+            <button
+              type="button"
+              onClick={() => setLoginMethod("otp")}
+              className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                loginMethod === "otp"
+                  ? "bg-[#4A90E2] text-white"
+                  : "text-[#B0B0B0] hover:text-white"
+              }`}
+            >
+              OTP
+            </button>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Email */}
             <div className="space-y-2">
@@ -139,16 +208,45 @@ export default function LoginForm({ onStepChange }) {
                 <Input
                   type="email"
                   value={email}
-                  onChange={(e) => handleInputChange(e.target.value)}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
                   className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] pl-10"
                   placeholder="your.email@sit.ac.in"
                   disabled={isLoading}
                 />
               </div>
-              {error && (
-                <p className="text-red-400 text-sm">{error}</p>
-              )}
             </div>
+
+            {/* Password Field (only for password login) */}
+            {loginMethod === "password" && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-[#E0E0E0]">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#B0B0B0]" />
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] pl-10 pr-10"
+                    placeholder="Enter your password"
+                    disabled={isLoading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#B0B0B0] hover:text-white"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {error && (
+              <p className="text-red-400 text-sm">{error}</p>
+            )}
 
             {/* Submit Button */}
             <Button
@@ -159,27 +257,49 @@ export default function LoginForm({ onStepChange }) {
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Sending verification code...
+                  {loginMethod === "password" ? "Signing in..." : "Sending verification code..."}
                 </div>
               ) : submitCooldown > 0 ? (
                 `Wait ${submitCooldown}s`
+              ) : loginMethod === "password" ? (
+                "Sign In"
               ) : (
                 "Send Verification Code"
               )}
             </Button>
+
+            {/* Forgot Password Link (only for password login) */}
+            {loginMethod === "password" && (
+              <div className="text-center">
+                <button
+                  type="button"
+                  onClick={() => onStepChange('forgot-password', { email })}
+                  className="text-[#4A90E2] hover:underline text-sm"
+                  disabled={isLoading}
+                >
+                  Forgot your password?
+                </button>
+              </div>
+            )}
           </form>
 
           {/* Info Box */}
           <div className="bg-[#4A90E2]/10 border border-[#4A90E2]/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              <Mail className="w-5 h-5 text-[#4A90E2] mt-0.5 flex-shrink-0" />
+              {loginMethod === "password" ? (
+                <Lock className="w-5 h-5 text-[#4A90E2] mt-0.5 flex-shrink-0" />
+              ) : (
+                <Mail className="w-5 h-5 text-[#4A90E2] mt-0.5 flex-shrink-0" />
+              )}
               <div className="space-y-1">
                 <h4 className="text-sm font-medium text-[#4A90E2]">
-                  Passwordless Login
+                  {loginMethod === "password" ? "Secure Login" : "Passwordless Login"}
                 </h4>
                 <p className="text-xs text-[#B0B0B0]">
-                  We'll send a 6-digit verification code to your email. 
-                  No password required!
+                  {loginMethod === "password" 
+                    ? "Sign in securely with your email and password."
+                    : "We'll send a 6-digit verification code to your email. No password required!"
+                  }
                 </p>
               </div>
             </div>

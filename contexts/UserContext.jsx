@@ -24,6 +24,38 @@ const calculateProfileCompletion = (profile) => {
   return Math.round((filledFields.length / fields.length) * 100)
 }
 
+// Safely fetch a single users row by auth_id even if duplicates exist
+const getDbProfileByAuthId = async (authId) => {
+  try {
+    // First try the fast path
+    const { data, error, status } = await supabase
+      .from('users')
+      .select('*')
+      .eq('auth_id', authId)
+      .single()
+    
+    if (!error) return { data, error: null }
+
+    // If multiple rows (406) or ambiguous result, fall back to latest by updated_at
+    const isMultiple = status === 406 || (error?.message || '').toLowerCase().includes('multiple') || (error?.message || '').toLowerCase().includes('results contain')
+    if (isMultiple) {
+      const { data: rows, error: listError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', authId)
+        .order('updated_at', { ascending: false, nullsLast: true })
+        .limit(1)
+
+      if (listError) return { data: null, error: listError }
+      return { data: rows?.[0] || null, error: null }
+    }
+
+    return { data: null, error }
+  } catch (e) {
+    return { data: null, error: e }
+  }
+}
+
 export function useUser() {
   const context = useContext(UserContext)
   if (!context) {
@@ -56,14 +88,9 @@ export function UserProvider({ children }) {
         
         console.log('UserContext: Auth metadata:', authMetadata)
 
-        // Try to fetch from users table
-        const { data: dbProfile, error: dbError } = await supabase
-          .from('users')
-          .select('*')
-          .eq('auth_id', user.id)
-          .single()
-
-        if (dbError && dbError.code !== 'PGRST116') {
+        // Try to fetch from users table safely (handles duplicates)
+        const { data: dbProfile, error: dbError } = await getDbProfileByAuthId(user.id)
+        if (dbError) {
           console.error('UserContext: Database error:', dbError)
         }
 
@@ -146,14 +173,9 @@ export function UserProvider({ children }) {
       
       console.log('UserContext: Fresh auth metadata:', authMetadata)
 
-      // Try to fetch from users table
-      const { data: dbProfile, error: dbError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', freshUser.id)
-        .single()
-
-      if (dbError && dbError.code !== 'PGRST116') {
+      // Try to fetch from users table safely (handles duplicates)
+      const { data: dbProfile, error: dbError } = await getDbProfileByAuthId(freshUser.id)
+      if (dbError) {
         console.error('UserContext: Database error:', dbError)
       }
 
@@ -216,6 +238,24 @@ export function UserProvider({ children }) {
     try {
       console.log('UserContext: Updating profile with:', updates)
 
+      // Prevent infinite loops - check if updates are actually different
+      const currentProfile = userProfile || {}
+      const hasChanges = Object.keys(updates).some(key => {
+        const newValue = updates[key]
+        const currentValue = currentProfile[key]
+        
+        // Handle different types of comparisons
+        if (typeof newValue === 'object' && typeof currentValue === 'object') {
+          return JSON.stringify(newValue) !== JSON.stringify(currentValue)
+        }
+        return newValue !== currentValue
+      })
+
+      if (!hasChanges) {
+        console.log('UserContext: No changes detected, skipping update')
+        return { success: true }
+      }
+
       // Update auth metadata
       const { data: authData, error: authError } = await supabase.auth.updateUser({
         data: {
@@ -263,7 +303,7 @@ export function UserProvider({ children }) {
         throw new Error(dbError.message || 'Failed to update user profile in database')
       }
 
-      // Update local state
+      // Update local state only if there were actual changes
       setUserProfile(prev => ({
         ...prev,
         ...updates,
