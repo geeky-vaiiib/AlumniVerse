@@ -140,3 +140,6 @@ async function testProfileRedirectFix() {
 
 // Run the test
 testProfileRedirectFix()
+
+
+

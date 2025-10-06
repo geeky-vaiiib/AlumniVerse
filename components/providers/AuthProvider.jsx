@@ -150,32 +150,30 @@ export function AuthProvider({ children }) {
     // Initialize session
     getInitialSession()
 
-    // Listen for auth changes with profile handling
+        // Listen for auth changes with profile handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (mounted) {
-          console.log('AuthProvider: Auth state change:', {
-            event,
-            hasSession: !!session,
+          setLoading(true)
+          console.log('🔐 [TEMP] AuthProvider: Auth state change', { 
+            event, 
             userEmail: session?.user?.email,
             userId: session?.user?.id,
-            sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'No expiry'
+            hasSession: !!session,
+            timestamp: new Date().toISOString()
           })
-          
           setSession(session)
           setUser(session?.user ?? null)
           
-          // Handle profile creation for new sessions (non-blocking)
+          // Handle profile creation for new sessions
           if (event === 'SIGNED_IN' && session?.user?.id) {
-            console.log('AuthProvider: User signed in, ensuring profile exists...')
-            fetchOrCreateProfile(session.user.id, session.user.email).catch(err => {
-              console.warn('Profile creation failed during sign-in (non-critical):', err)
-            })
+            console.log('🔐 [TEMP] AuthProvider: Triggering profile fetch/create for new session')
+            await fetchOrCreateProfile(session.user.id, session.user.email)
           }
           
-          if (event === 'SIGNED_OUT') {
-            console.log('AuthProvider: User signed out, clearing state')
-          }
+          setLoading(false)
+          setIsReady(true)
+          console.log('🔐 [TEMP] AuthProvider: State update complete', { loading: false, isReady: true })
         }
       }
     )
@@ -226,6 +224,8 @@ export function AuthProvider({ children }) {
   // Verify OTP with robust session handling and profile creation
   const verifyOTP = async (email, token, userData = {}) => {
     try {
+      console.log('🔐 [TEMP] AuthProvider: Starting OTP verification', { email, hasUserData: !!userData })
+      
       const { data, error } = await supabase.auth.verifyOtp({
         email,
         token,
@@ -241,12 +241,24 @@ export function AuthProvider({ children }) {
         throw new Error('No user returned after OTP verification')
       }
 
-      // Wait for session to propagate
-      await new Promise(resolve => setTimeout(resolve, 400))
+      console.log('🔐 [TEMP] AuthProvider: OTP verification successful', { 
+        userId: user.id, 
+        email: user.email,
+        hasSession: !!session 
+      })
+
+      // FIXED: Increased wait time for session to fully propagate to prevent race conditions
+      console.log('🔐 [TEMP] AuthProvider: Waiting for session propagation...')
+      await new Promise(resolve => setTimeout(resolve, 800))
 
       // Get fresh session from client
       const { data: sessionRes } = await supabase.auth.getSession()
       const currentUser = sessionRes?.session?.user ?? user
+
+      console.log('🔐 [TEMP] AuthProvider: Fresh session retrieved', { 
+        currentUserId: currentUser.id,
+        hasSession: !!sessionRes?.session
+      })
 
       // Check if profile exists
       const { data: profile, error: profileErr } = await supabase

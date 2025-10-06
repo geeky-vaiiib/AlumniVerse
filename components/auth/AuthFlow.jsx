@@ -75,10 +75,10 @@ export default function AuthFlow({ initialStep = 'login' }) {
       }
       
       // Redirect authenticated user away from auth page
-      console.log('AuthFlow: User authenticated, redirecting to:', redirectTo)
+      console.log('🔐 [TEMP] AuthFlow: User authenticated, redirecting to:', redirectTo)
       setHasRedirected(true)
-      // Use Next.js router for SPA navigation
-      router.replace(redirectTo)
+      // FIXED: Use router navigation instead of hard redirect to prevent middleware loops
+      router.push(redirectTo)
     }
   }, [session, isLoggedIn, currentStep, isReady, loading, hasRedirected, userProfile])
 
@@ -89,11 +89,12 @@ export default function AuthFlow({ initialStep = 'login' }) {
   }
 
   const handleProfileComplete = async (profileData) => {
-    console.log('Profile creation completed:', profileData)
+    console.log('🔐 [TEMP] AuthFlow: Profile creation completed:', profileData)
 
     try {
       // Profile was already created via API in ProfileCreationFlow
-      console.log('Profile saved successfully')
+      // Just redirect to dashboard
+      console.log('🔐 [TEMP] AuthFlow: Profile saved successfully')
 
       // Store profile data in local state
       setAuthData(prev => ({ ...prev, profile: profileData }))
@@ -102,24 +103,11 @@ export default function AuthFlow({ initialStep = 'login' }) {
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirectTo') || '/dashboard'
 
-      console.log('AuthFlow: Profile completed, ensuring profile refresh then redirecting to:', redirectTo)
-
-      // Ensure the user context / profile is refreshed before navigation
-      if (typeof updateProfile === 'function') {
-        try {
-          // Update the profile context with the new data
-          await updateProfile(profileData)
-          console.log('AuthFlow: Profile context updated successfully')
-        } catch (err) {
-          console.warn('AuthFlow: Profile context update failed (continuing to redirect):', err)
-        }
-      }
-
-      // Use Next router to avoid hard reloads and preserve client session state
-      console.log('AuthFlow: Using Next.js router for navigation to:', redirectTo)
-      router.replace(redirectTo)
+      // FIXED: Use router navigation instead of hard redirect
+      console.log('🔐 [TEMP] AuthFlow: Profile completed, using router.push to:', redirectTo)
+      router.push(redirectTo)
     } catch (error) {
-      console.error('Error saving profile:', error)
+      console.error('🔐 [TEMP] AuthFlow: Error saving profile:', error)
       // Show error and stay on the profile page to allow retry
       toast({
         title: 'Failed to save profile',

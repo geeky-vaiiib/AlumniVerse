@@ -110,6 +110,7 @@ export default function OTPVerification({
     setError("")
 
     try {
+      console.log('🔐 [TEMP] OTPVerification: Starting verification', { email, isSignUp, hasUserData: !!userData })
       console.log('Verifying OTP via Supabase:', { email })
 
       // Check if auth service is ready
@@ -129,6 +130,12 @@ export default function OTPVerification({
         passing_year: userData?.passing_year
       })
 
+      console.log('🔐 [TEMP] OTPVerification: Verification result', { 
+        success: !authError && !!data, 
+        hasUser: !!(data?.user),
+        error: authError?.message 
+      })
+
       if (!authError && data && data.user) {
         setSuccess("✅ Email verified successfully!")
 
@@ -141,6 +148,7 @@ export default function OTPVerification({
 
         // Small delay to show success message
         setTimeout(() => {
+          console.log('🔐 [TEMP] OTPVerification: Initiating redirect', { isSignUp })
           console.log('OTP verification successful')
           // Clear any pending session storage
           sessionStorage.removeItem('pendingVerificationEmail')
@@ -151,9 +159,18 @@ export default function OTPVerification({
           sessionStorage.removeItem('pendingJoiningYear')
           sessionStorage.removeItem('pendingPassingYear')
           
-          // Use hard navigation to ensure session cookies are properly set
-          // This forces a full page reload with the new session
-          window.location.href = '/dashboard'
+          // FIXED: Use router navigation instead of hard window.location redirect
+          // This prevents middleware redirect loops and preserves SPA state
+          console.log('🔐 [TEMP] OTPVerification: Using router.push instead of window.location')
+          if (isSignUp) {
+            // For new signups, go to profile creation
+            console.log('🔐 [TEMP] OTPVerification: Redirecting to profile creation')
+            onStepChange('profile', { email, firstName, lastName, isSignUp, userData })
+          } else {
+            // For existing users (login), go directly to dashboard
+            console.log('🔐 [TEMP] OTPVerification: Redirecting to dashboard')
+            router.push('/dashboard')
+          }
         }, 1500)
       } else {
         setVerifyAttempts(prev => prev + 1)
