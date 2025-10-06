@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react"
 import { useParams } from "next/navigation"
-import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
-import { Button } from "../../components/ui/button"
-import { Badge } from "../../components/ui/badge"
-import { Separator } from "../../components/ui/separator"
+import { Card, CardContent, CardHeader, CardTitle } from "../../../components/ui/card"
+import { Button } from "../../../components/ui/button"
+import { Badge } from "../../../components/ui/badge"
+import { Separator } from "../../../components/ui/separator"
 import { 
   MapPin, 
   Building, 
@@ -20,8 +20,8 @@ import {
   Users,
   MessageCircle
 } from "lucide-react"
-import { generateAvatar } from "../../lib/utils"
-import { supabase } from "../../lib/supabaseClient"
+import { generateAvatar } from "../../../lib/utils"
+import { supabase } from "../../../lib/supabaseClient"
 import Link from "next/link"
 
 export default function UserProfilePage() {

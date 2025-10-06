@@ -4,23 +4,23 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { GraduationCap, Mail, AlertCircle, Eye, EyeOff, Lock } from "lucide-react"
+import { GraduationCap, Mail, AlertCircle, Shield, Eye, EyeOff } from "lucide-react"
 import { useAuth } from "../providers/AuthProvider"
 import { parseInstitutionalEmail } from "../../lib/utils/emailParser"
 
 export default function SignUpForm({ onStepChange }) {
-  const { signUpWithOTP, isReady, error: authError } = useAuth()
+  const { signUpWithOTP, signUpWithPassword, isReady, error: authError } = useAuth()
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
     email: "",
     password: "",
-    confirmPassword: "",
+    confirmPassword: ""
   })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [extractedData, setExtractedData] = useState(null)
   const [emailTouched, setEmailTouched] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [submitCooldown, setSubmitCooldown] = useState(0)
@@ -107,13 +107,16 @@ export default function SignUpForm({ onStepChange }) {
       newErrors.email = "Please use your SIT institutional email (@sit.ac.in)"
     }
 
+    // Validate extracted data
+    if (formData.email.endsWith('@sit.ac.in') && !extractedData) {
+      newErrors.email = "Invalid SIT email format. Please use format: 1si23cs001@sit.ac.in"
+    }
+
     // Validate password
     if (!formData.password) {
       newErrors.password = "Password is required"
     } else if (formData.password.length < 8) {
       newErrors.password = "Password must be at least 8 characters"
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = "Password must contain uppercase, lowercase, and number"
     }
 
     // Validate confirm password
@@ -121,11 +124,6 @@ export default function SignUpForm({ onStepChange }) {
       newErrors.confirmPassword = "Please confirm your password"
     } else if (formData.password !== formData.confirmPassword) {
       newErrors.confirmPassword = "Passwords do not match"
-    }
-
-    // Validate extracted data
-    if (formData.email.endsWith('@sit.ac.in') && !extractedData) {
-      newErrors.email = "Invalid SIT email format. Please use format: 1si23cs001@sit.ac.in"
     }
 
     setErrors(newErrors)
@@ -166,27 +164,31 @@ export default function SignUpForm({ onStepChange }) {
         return
       }
 
-      // Send OTP using Supabase Auth
-      const { data, error } = await signUpWithOTP(
+      // Sign up with password
+      const { data, error } = await signUpWithPassword(
         formData.email.trim().toLowerCase(),
+        formData.password,
         metadata
       )
 
       if (error) {
         console.error('Signup error:', error)
         
-        if (error.message?.includes('already registered')) {
-          setErrors({ email: "This email is already registered. Try signing in instead." })
+        if (error.message?.includes('already registered') || error.message?.includes('User already registered')) {
+          setErrors({ email: "This email is already registered. Please use the 'Sign In' option instead." })
         } else if (error.status === 429 || /rate limit|Too Many Requests/i.test(error.message || '')) {
           setErrors({ submit: "Too many attempts. Please wait before trying again." })
           setSubmitCooldown(60)
         } else {
-          setErrors({ submit: error.message || "Failed to send verification code" })
+          setErrors({ submit: error.message || "Failed to create account" })
         }
         return
       }
 
-      console.log('OTP sent successfully:', data)
+      console.log('Account created successfully, sending OTP...')
+      
+      // Also send OTP for email verification
+      await signUpWithOTP(formData.email.trim().toLowerCase(), metadata)
 
       // Store user data in sessionStorage for the OTP verification
       sessionStorage.setItem('pendingVerificationEmail', formData.email.trim().toLowerCase())
@@ -207,13 +209,15 @@ export default function SignUpForm({ onStepChange }) {
         email: formData.email.trim().toLowerCase(),
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
-        password: formData.password,
         isSignUp: true,
         userData: metadata
       })
 
     } catch (error) {
-      console.error('Unexpected error:', error)
+      // Only log errors with meaningful content
+      if (error && (error.message || error.code || Object.keys(error).length > 0)) {
+        console.error('Unexpected error:', error)
+      }
       setErrors({ submit: "An unexpected error occurred. Please try again." })
     } finally {
       setIsLoading(false)
@@ -361,6 +365,19 @@ export default function SignUpForm({ onStepChange }) {
               </div>
             )}
 
+            {/* Security Info */}
+            <div className="bg-[#4A90E2]/10 border border-[#4A90E2]/30 rounded-lg p-4 flex items-start space-x-3">
+              <Shield className="w-5 h-5 text-[#4A90E2] mt-0.5 flex-shrink-0" />
+              <div className="space-y-1">
+                <h4 className="text-sm font-medium text-[#4A90E2]">
+                  Email Verification Required
+                </h4>
+                <p className="text-xs text-[#B0B0B0]">
+                  After creating your account, we'll send a verification code to your email to confirm your identity.
+                </p>
+              </div>
+            </div>
+
             {/* Submit Button */}
             <Button
               type="submit"
@@ -370,12 +387,12 @@ export default function SignUpForm({ onStepChange }) {
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  Sending verification code...
+                  Creating account...
                 </div>
               ) : submitCooldown > 0 ? (
                 `Wait ${submitCooldown}s`
               ) : (
-                "Send Verification Code"
+                "Create Account"
               )}
             </Button>
 

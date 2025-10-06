@@ -7,8 +7,25 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 )
 
+// Validate environment variables
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('Missing required environment variables:', {
+    SUPABASE_URL: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+    SERVICE_ROLE_KEY: !!process.env.SUPABASE_SERVICE_ROLE_KEY
+  })
+}
+
 export async function POST(request) {
   try {
+    // Check if environment variables are available
+    if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.error('Missing Supabase environment variables')
+      return NextResponse.json(
+        { error: 'Server configuration error - missing Supabase credentials' },
+        { status: 500 }
+      )
+    }
+
     const body = await request.json()
     const { auth_id, email, first_name, last_name, usn, branch, branch_code, admission_year, passing_year } = body
 

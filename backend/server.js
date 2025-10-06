@@ -6,6 +6,7 @@ const compression = require('compression');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
 
 // Import middleware
 const { globalErrorHandler, notFound } = require('./middlewares/errorMiddleware');
@@ -203,7 +204,53 @@ process.on('unhandledRejection', (err) => {
   process.exit(1);
 });
 
-// Start server with email verification
+// Test Supabase database connection
+const testSupabaseConnection = async () => {
+  try {
+    if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      console.log('⚠️ Supabase environment variables not configured');
+      return false;
+    }
+
+    const supabase = createClient(
+      process.env.SUPABASE_URL,
+      process.env.SUPABASE_SERVICE_ROLE_KEY
+    );
+
+    // Test database connection with a simple query
+    const { data, error } = await supabase.from('users').select('count').limit(1);
+    
+    if (error) {
+      console.log(`❌ Supabase Database Connection Failed: ${error.message}`);
+      return false;
+    } else {
+      console.log('✅ Supabase Database Connected Successfully!');
+      
+      // Additional check: Verify auth_id column exists
+      try {
+        const { data: schemaData, error: schemaError } = await supabase.rpc('check_column_exists', {
+          table_name: 'users',
+          column_name: 'auth_id'
+        });
+        
+        if (schemaError) {
+          console.log('⚠️ Could not verify auth_id column (this is okay)');
+        } else {
+          console.log('✅ Database schema verified');
+        }
+      } catch (e) {
+        console.log('⚠️ Schema check skipped (this is okay)');
+      }
+      
+      return true;
+    }
+  } catch (err) {
+    console.log(`❌ Supabase Connection Error: ${err.message}`);
+    return false;
+  }
+};
+
+// Start server with database verification
 const server = app.listen(PORT, async () => {
   console.log(`
 🚀 AlumniVerse Backend Server Started Successfully!
@@ -237,8 +284,12 @@ const server = app.listen(PORT, async () => {
 Ready to serve the AlumniVerse frontend! 🎓
   `);
 
-  // Using Supabase Auth - no email service verification needed
-  console.log('\n✅ Supabase Auth ready!');
+  // Test Supabase connections
+  console.log('\n🔍 Testing Supabase Connections...');
+  console.log('✅ Supabase Auth ready!');
+  
+  // Test database connection
+  await testSupabaseConnection();
 });
 
 module.exports = app;

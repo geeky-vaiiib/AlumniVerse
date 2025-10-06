@@ -7,6 +7,7 @@ import SignUpForm from "./SignUpForm"
 import OTPVerification from "./OTPVerification"
 import ProfileCreationFlow from "./ProfileCreationFlow"
 import ForgotPassword from "./ForgotPassword"
+import DebugAuthFlow from "./DebugAuthFlow"
 import { useAuth } from "../providers/AuthProvider"
 import { useUser } from "../../contexts/UserContext"
 import { useToast } from "../../hooks/use-toast"
@@ -14,30 +15,72 @@ import { useToast } from "../../hooks/use-toast"
 export default function AuthFlow({ initialStep = 'login' }) {
   const router = useRouter()
   const { session, loading, isLoggedIn, isReady } = useAuth()
-  const { updateProfile } = useUser()
+  const { updateProfile, userProfile } = useUser()
   const [currentStep, setCurrentStep] = useState(initialStep)
   const [authData, setAuthData] = useState({})
   const { toast } = useToast()
+  const [hasRedirected, setHasRedirected] = useState(false)
 
-  console.log('AuthFlow: Rendering with state -', {
-    loading,
-    isLoggedIn,
-    hasSession: !!session,
-    hasUser: !!session?.user,
-    currentStep,
-    isReady
-  })
+  // Only log state changes, not every render
+  const stateKey = `${loading}-${isLoggedIn}-${!!session}-${currentStep}-${isReady}`
+  const [lastStateKey, setLastStateKey] = useState('')
+  
+  if (stateKey !== lastStateKey) {
+    console.log('AuthFlow: State changed -', {
+      loading,
+      isLoggedIn,
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      currentStep,
+      isReady,
+      hasProfile: !!userProfile,
+      profileCompleted: userProfile?.profileCompleted
+    })
+    setLastStateKey(stateKey)
+  }
 
-  // Simple auth check - only redirect if not in profile creation step
+  // Handle redirect with URL parameters - ONLY when authenticated
   useEffect(() => {
-    console.log('AuthFlow: Auth check effect triggered', { isLoggedIn, hasSession: !!session, currentStep })
-
-    // Don't redirect if we're in the profile creation step
-    if ((isLoggedIn || session?.user) && currentStep !== 'profile' && currentStep !== 'otp-verification') {
-      console.log('AuthFlow: User authenticated, redirecting to dashboard')
-      router.push('/dashboard')
+    // Wait for auth to be ready before attempting redirects
+    if (!isReady || loading) {
+      console.log('AuthFlow: Waiting for auth to be ready...', { isReady, loading })
+      return
     }
-  }, [session, isLoggedIn, router, currentStep])
+
+    if (hasRedirected) return // Prevent multiple redirects
+
+    // Get redirect URL from search params
+    const urlParams = new URLSearchParams(window.location.search)
+    const redirectTo = urlParams.get('redirectTo') || null
+    
+    // CRITICAL: Only redirect if user is actually authenticated
+    const isAuthenticated = !!(session?.user || isLoggedIn)
+    
+    console.log('AuthFlow: Auth check effect triggered', { 
+      isLoggedIn, 
+      hasSession: !!session, 
+      isAuthenticated,
+      currentStep,
+      redirectTo,
+      isReady,
+      hasProfile: !!userProfile
+    })
+
+    // If user is authenticated and there's a redirect target
+    if (isAuthenticated && redirectTo) {
+      // Don't redirect if we're in the OTP verification step (let it complete naturally)
+      if (currentStep === 'otp-verification') {
+        console.log('AuthFlow: In OTP verification, skipping redirect')
+        return
+      }
+      
+      // Redirect authenticated user away from auth page
+      console.log('AuthFlow: User authenticated, redirecting to:', redirectTo)
+      setHasRedirected(true)
+      // Use Next.js router for SPA navigation
+      router.replace(redirectTo)
+    }
+  }, [session, isLoggedIn, currentStep, isReady, loading, hasRedirected, userProfile])
 
   const handleStepChange = (step, data = {}) => {
     console.log('Step change:', step, data)
@@ -49,34 +92,32 @@ export default function AuthFlow({ initialStep = 'login' }) {
     console.log('Profile creation completed:', profileData)
 
     try {
-      // Update user profile in Supabase
-      await updateProfile({
-        firstName: profileData.firstName,
-        lastName: profileData.lastName,
-        usn: profileData.usn,
-        branch: profileData.branch,
-        joiningYear: profileData.joiningYear,
-        passingYear: profileData.passingYear,
-        currentCompany: profileData.currentCompany,
-        designation: profileData.designation,
-        location: profileData.location,
-        linkedinUrl: profileData.linkedinUrl,
-        githubUrl: profileData.githubUrl,
-        leetcodeUrl: profileData.leetcodeUrl,
-        resumeUrl: profileData.resumeUrl,
-        bio: profileData.bio,
-        skills: profileData.skills ? profileData.skills.split(',').map(s => s.trim()) : [],
-        profileCompleted: true,
-        profileCompletion: 100
-      })
-
+      // Profile was already created via API in ProfileCreationFlow
       console.log('Profile saved successfully')
 
       // Store profile data in local state
       setAuthData(prev => ({ ...prev, profile: profileData }))
 
-      // Redirect to dashboard
-      router.push('/dashboard')
+      // Get redirect URL from search params
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirectTo = urlParams.get('redirectTo') || '/dashboard'
+
+      console.log('AuthFlow: Profile completed, ensuring profile refresh then redirecting to:', redirectTo)
+
+      // Ensure the user context / profile is refreshed before navigation
+      if (typeof updateProfile === 'function') {
+        try {
+          // Update the profile context with the new data
+          await updateProfile(profileData)
+          console.log('AuthFlow: Profile context updated successfully')
+        } catch (err) {
+          console.warn('AuthFlow: Profile context update failed (continuing to redirect):', err)
+        }
+      }
+
+      // Use Next router to avoid hard reloads and preserve client session state
+      console.log('AuthFlow: Using Next.js router for navigation to:', redirectTo)
+      router.replace(redirectTo)
     } catch (error) {
       console.error('Error saving profile:', error)
       // Show error and stay on the profile page to allow retry

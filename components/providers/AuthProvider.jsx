@@ -22,17 +22,21 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
-    // Test Supabase connection
+    // Set ready immediately for auth operations
+    setIsReady(true)
+    setLoading(false)
+
+    // Test Supabase connection (non-blocking)
     const testConnection = async () => {
       try {
         const { error } = await supabase.from('users').select('*').limit(1)
         if (error) {
-          console.error('Supabase connection test failed:', error)
+          console.warn('Supabase users table test failed (expected if auth_id column missing):', error.message)
         } else {
           console.log('✅ Supabase users table reachable')
         }
       } catch (err) {
-        console.error('Supabase connection error:', err)
+        console.warn('Supabase connection test error (non-critical):', err.message)
       }
     }
 
@@ -123,21 +127,19 @@ export function AuthProvider({ children }) {
             setSession(session)
             setUser(session?.user ?? null)
             
-            // If user is logged in, ensure profile exists
+            // If user is logged in, try to ensure profile exists (non-blocking)
             if (session?.user?.id) {
-              await fetchOrCreateProfile(session.user.id, session.user.email)
+              fetchOrCreateProfile(session.user.id, session.user.email).catch(err => {
+                console.warn('Profile creation failed during initialization (non-critical):', err)
+              })
             }
           }
-          setLoading(false)
-          setIsReady(true)
         }
       } catch (error) {
         console.error('Session initialization error:', error)
         if (mounted) {
           setSession(null)
           setUser(null)
-          setLoading(false)
-          setIsReady(true)
         }
       }
     }
@@ -152,17 +154,28 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (mounted) {
-          console.log('Auth state change:', event, session?.user?.email)
+          console.log('AuthProvider: Auth state change:', {
+            event,
+            hasSession: !!session,
+            userEmail: session?.user?.email,
+            userId: session?.user?.id,
+            sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'No expiry'
+          })
+          
           setSession(session)
           setUser(session?.user ?? null)
           
-          // Handle profile creation for new sessions
+          // Handle profile creation for new sessions (non-blocking)
           if (event === 'SIGNED_IN' && session?.user?.id) {
-            await fetchOrCreateProfile(session.user.id, session.user.email)
+            console.log('AuthProvider: User signed in, ensuring profile exists...')
+            fetchOrCreateProfile(session.user.id, session.user.email).catch(err => {
+              console.warn('Profile creation failed during sign-in (non-critical):', err)
+            })
           }
           
-          setLoading(false)
-          setIsReady(true)
+          if (event === 'SIGNED_OUT') {
+            console.log('AuthProvider: User signed out, clearing state')
+          }
         }
       }
     )
@@ -179,7 +192,8 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          data: userData
+          data: userData,
+          shouldCreateUser: true
         }
       })
 
@@ -187,6 +201,24 @@ export function AuthProvider({ children }) {
       return { data, error: null }
     } catch (error) {
       console.error('Sign up error:', error)
+      return { data: null, error }
+    }
+  }
+
+  // Sign in with OTP
+  const signInWithOTP = async (email) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithOtp({
+        email,
+        options: {
+          shouldCreateUser: false
+        }
+      })
+
+      if (error) throw error
+      return { data, error: null }
+    } catch (error) {
+      console.error('Sign in with OTP error:', error)
       return { data: null, error }
     }
   }
@@ -249,6 +281,9 @@ export function AuthProvider({ children }) {
 
           if (response.ok) {
             console.log('Profile created successfully via server endpoint')
+          } else if (response.status === 409) {
+            // Profile already exists - this is fine, not an error
+            console.log('Profile already exists (expected on re-verification)')
           } else {
             const errorData = await response.json()
             console.warn('Server profile creation failed:', errorData)
@@ -257,6 +292,8 @@ export function AuthProvider({ children }) {
           console.warn('Server profile creation error:', serverError)
           // Continue anyway - profile can be created later
         }
+      } else if (profile) {
+        console.log('Profile found in database')
       }
 
       return { data, error: null }
@@ -293,10 +330,19 @@ export function AuthProvider({ children }) {
         password
       })
 
-      if (error) throw error
+      if (error) {
+        // Don't log error for invalid credentials - it's expected for OTP-only users
+        if (error.code !== 'invalid_credentials') {
+          console.error('Sign in with password error:', error)
+        }
+        throw error
+      }
       return { data, error: null }
     } catch (error) {
-      console.error('Sign in with password error:', error)
+      // Only log unexpected errors, not invalid credentials
+      if (error.code !== 'invalid_credentials') {
+        console.error('Password login error:', error)
+      }
       return { data: null, error }
     }
   }
@@ -351,7 +397,9 @@ export function AuthProvider({ children }) {
     session,
     loading,
     isReady,
+    isLoggedIn: !!session,
     signUpWithOTP,
+    signInWithOTP,
     verifyOTP,
     signUpWithPassword,
     signInWithPassword,

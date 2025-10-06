@@ -14,15 +14,18 @@ export default function ProfileCreation({ userData, onStepChange }) {
 
     // Refresh the user profile context with the new data
     try {
+      console.log('ProfileCreation: Refreshing profile context...')
       await refreshProfile()
+      console.log('ProfileCreation: Profile context refreshed successfully')
     } catch (error) {
       console.error('Failed to refresh profile:', error)
     }
 
-    // Redirect after showing success message
+    // Redirect after showing success message - use shorter delay for better UX
     setTimeout(() => {
+      console.log('ProfileCreation: Redirecting to dashboard...')
       window.location.href = "/dashboard"
-    }, 2000)
+    }, 1500)
   }
 
   return (

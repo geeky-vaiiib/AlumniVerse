@@ -151,13 +151,9 @@ export default function OTPVerification({
           sessionStorage.removeItem('pendingJoiningYear')
           sessionStorage.removeItem('pendingPassingYear')
           
-          if (isSignUp) {
-            // For new signups, go to profile creation
-            onStepChange('profile', { email, firstName, lastName, isSignUp, userData })
-          } else {
-            // For existing users (login), go directly to dashboard
-            router.push('/dashboard')
-          }
+          // Use hard navigation to ensure session cookies are properly set
+          // This forces a full page reload with the new session
+          window.location.href = '/dashboard'
         }, 1500)
       } else {
         setVerifyAttempts(prev => prev + 1)

@@ -4,14 +4,13 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { Button } from "../ui/button"
 import { Input } from "../ui/input"
-import { GraduationCap, Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { GraduationCap, Mail } from "lucide-react"
 import { useAuth } from "../providers/AuthProvider"
 
 export default function LoginForm({ onStepChange }) {
   const { signInWithPassword, signInWithOTP, isReady } = useAuth()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [submitCooldown, setSubmitCooldown] = useState(0)
@@ -33,7 +32,6 @@ export default function LoginForm({ onStepChange }) {
     } else if (field === 'password') {
       setPassword(value)
     }
-    
     if (error) {
       setError("")
     }
@@ -97,8 +95,8 @@ export default function LoginForm({ onStepChange }) {
         if (authError) {
           console.error('Password login error:', authError)
           
-          if (authError.message?.includes('Invalid login credentials')) {
-            setError("Invalid email or password. Please check your credentials.")
+          if (authError.code === 'invalid_credentials') {
+            setError("Invalid email or password. If you signed up with OTP only, try 'Sign in with OTP'.")
           } else if (authError.message?.includes('Email not confirmed')) {
             setError("Please verify your email address first.")
           } else if (authError.message?.includes('rate limit')) {
@@ -110,9 +108,9 @@ export default function LoginForm({ onStepChange }) {
           return
         }
 
-        console.log('Password login successful:', data)
-        // AuthProvider will handle the redirect via useEffect in AuthFlow
-
+        console.log('Password login successful, redirecting to dashboard...')
+        // Redirect handled by AuthFlow
+        
       } else {
         console.log('Sending login OTP to:', email)
 
@@ -139,6 +137,9 @@ export default function LoginForm({ onStepChange }) {
 
         // Store email for OTP verification
         sessionStorage.setItem('pendingVerificationEmail', email.trim().toLowerCase())
+
+        // Set cooldown for resend
+        setSubmitCooldown(18)
 
         // Move to OTP verification step
         onStepChange('otp-verification', {
@@ -222,24 +223,14 @@ export default function LoginForm({ onStepChange }) {
                 <label className="text-sm font-medium text-[#E0E0E0]">
                   Password
                 </label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-[#B0B0B0]" />
-                  <Input
-                    type={showPassword ? "text" : "password"}
-                    value={password}
-                    onChange={(e) => handleInputChange('password', e.target.value)}
-                    className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2] pl-10 pr-10"
-                    placeholder="Enter your password"
-                    disabled={isLoading}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-[#B0B0B0] hover:text-white"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+                <Input
+                  type="password"
+                  value={password}
+                  onChange={(e) => handleInputChange('password', e.target.value)}
+                  className="bg-[#404040] border-[#606060] text-white placeholder-[#B0B0B0] focus:border-[#4A90E2]"
+                  placeholder="Enter your password"
+                  disabled={isLoading}
+                />
               </div>
             )}
 
@@ -257,7 +248,7 @@ export default function LoginForm({ onStepChange }) {
               {isLoading ? (
                 <div className="flex items-center gap-2">
                   <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                  {loginMethod === "password" ? "Signing in..." : "Sending verification code..."}
+                  {loginMethod === "password" ? "Signing in..." : "Sending code..."}
                 </div>
               ) : submitCooldown > 0 ? (
                 `Wait ${submitCooldown}s`
@@ -267,38 +258,20 @@ export default function LoginForm({ onStepChange }) {
                 "Send Verification Code"
               )}
             </Button>
-
-            {/* Forgot Password Link (only for password login) */}
-            {loginMethod === "password" && (
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => onStepChange('forgot-password', { email })}
-                  className="text-[#4A90E2] hover:underline text-sm"
-                  disabled={isLoading}
-                >
-                  Forgot your password?
-                </button>
-              </div>
-            )}
           </form>
 
           {/* Info Box */}
           <div className="bg-[#4A90E2]/10 border border-[#4A90E2]/30 rounded-lg p-4">
             <div className="flex items-start gap-3">
-              {loginMethod === "password" ? (
-                <Lock className="w-5 h-5 text-[#4A90E2] mt-0.5 flex-shrink-0" />
-              ) : (
-                <Mail className="w-5 h-5 text-[#4A90E2] mt-0.5 flex-shrink-0" />
-              )}
+              <Mail className="w-5 h-5 text-[#4A90E2] mt-0.5 flex-shrink-0" />
               <div className="space-y-1">
                 <h4 className="text-sm font-medium text-[#4A90E2]">
-                  {loginMethod === "password" ? "Secure Login" : "Passwordless Login"}
+                  {loginMethod === "password" ? "Password Login" : "OTP Login"}
                 </h4>
                 <p className="text-xs text-[#B0B0B0]">
                   {loginMethod === "password" 
-                    ? "Sign in securely with your email and password."
-                    : "We'll send a 6-digit verification code to your email. No password required!"
+                    ? "Sign in with the password you set during registration."
+                    : "We'll send a 6-digit verification code to your email."
                   }
                 </p>
               </div>

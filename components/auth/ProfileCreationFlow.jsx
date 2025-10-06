@@ -140,14 +140,46 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
     
     setIsLoading(true)
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Create profile via API endpoint
+      const response = await fetch('/api/profile/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          auth_id: user?.id,
+          email: formData.email,
+          first_name: formData.firstName,
+          last_name: formData.lastName,
+          usn: formData.usn,
+          branch: formData.branch,
+          admission_year: formData.joiningYear,
+          passing_year: formData.passingYear,
+          company: formData.currentCompany,
+          current_position: formData.designation,
+          location: formData.location,
+          linkedin_url: formData.linkedinUrl,
+          github_url: formData.githubUrl,
+          bio: formData.bio,
+          skills: formData.skills,
+          profile_completed: true
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to create profile')
+      }
+
+      console.log('Profile created successfully via API:', result)
       
-      // Call completion handler with form data
-      onComplete(formData)
+      // Call completion handler with server-created profile data
+      const createdProfile = result.data || formData
+      onComplete(createdProfile)
     } catch (error) {
-      console.error('Profile creation error:', error)
-      setErrors({ submit: 'Failed to create profile. Please try again.' })
+      console.error('Profile creation failed:', error)
+      setErrors({ submit: error.message || 'Failed to create profile. Please try again.' })
     } finally {
       setIsLoading(false)
     }
