@@ -164,3 +164,6 @@ If issues persist, the changes can be easily rolled back by:
 3. Reducing middleware logging verbosity
 
 The core fixes (SPA navigation, profile refresh awaiting) should resolve the redirect issues while maintaining backward compatibility.
+
+
+
