@@ -93,12 +93,24 @@ export default function LoginForm({ onStepChange }) {
         )
 
         if (authError) {
-          console.error('Password login error:', authError)
+          console.error('🔐 [TEMP] LoginForm: Password login error:', authError)
           
           if (authError.code === 'invalid_credentials') {
-            setError("Invalid email or password. If you signed up with OTP only, try 'Sign in with OTP'.")
-          } else if (authError.message?.includes('Email not confirmed')) {
-            setError("Please verify your email address first.")
+            // Check if user exists to provide better error message
+            try {
+              const existsResponse = await fetch(`/api/user/exists?email=${encodeURIComponent(email.trim().toLowerCase())}`)
+              const existsData = await existsResponse.json()
+              
+              if (existsData.exists) {
+                setError("Invalid password. This account may have been created with OTP only. Try 'Sign in with OTP' or reset your password.")
+              } else {
+                setError("No account found with this email. Please sign up first.")
+              }
+            } catch {
+              setError("Invalid email or password. If you signed up with OTP only, use 'Sign in with OTP' instead.")
+            }
+          } else if (authError.code === 'email_not_confirmed') {
+            setError("Please check your email and click the confirmation link before signing in with password.")
           } else if (authError.message?.includes('rate limit')) {
             setError("Too many attempts. Please wait before trying again.")
             setSubmitCooldown(60)

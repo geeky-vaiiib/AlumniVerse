@@ -1,0 +1,366 @@
+
+> my-v0-project@0.1.0 dev
+> next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Port 3001 is in use, trying 3002 instead.
+  ▲ Next.js 14.2.16
+  - Local:        http://localhost:3002
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 1393ms
+ ✓ Compiled /middleware in 95ms (144 modules)
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/health',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-06T13:56:36.308Z',
+  userAgent: 'curl/8.7.1...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: false,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing request to proceed: /api/health
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1010ms (693 modules)
+✅ Supabase client initialized successfully
+ GET /api/health 404 in 1110ms
+ ✓ Compiled in 174ms (348 modules)
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-06T13:56:47.261Z',
+  userAgent: 'node...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+ ✓ Compiled /api/profile/create in 121ms (442 modules)
+Creating profile for user: {
+  auth_id: 'test-auth-id-1759759007245',
+  email: 'idempotent.test@sit.ac.in'
+}
+Supabase insert error: {
+  code: '22P02',
+  details: null,
+  hint: null,
+  message: 'invalid input syntax for type uuid: "test-auth-id-1759759007245"'
+}
+ POST /api/profile/create 400 in 3066ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-06T13:57:31.617Z',
+  userAgent: 'node...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '12345678-1234-1234-1234-1759759051604',
+  email: 'idempotent.test@sit.ac.in'
+}
+Supabase insert error: {
+  code: '22P02',
+  details: null,
+  hint: null,
+  message: 'invalid input syntax for type uuid: "12345678-1234-1234-1234-1759759051604"'
+}
+ POST /api/profile/create 400 in 1571ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-06T14:03:42.626Z',
+  userAgent: 'node...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '3069538c-beb7-47bf-81ab-4e0910819b75',
+  email: 'idempotent.test@sit.ac.in'
+}
+Profile created successfully: fd85fe03-8f36-47fa-aed8-256fec00904a
+ POST /api/profile/create 200 in 3025ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-06T14:03:45.667Z',
+  userAgent: 'node...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '3069538c-beb7-47bf-81ab-4e0910819b75',
+  email: 'idempotent.test@sit.ac.in'
+}
+Profile already exists, returning existing profile: fd85fe03-8f36-47fa-aed8-256fec00904a
+ POST /api/profile/create 200 in 2777ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:18:36.073Z',
+  userAgent: 'node...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+ ✓ Compiled /_error in 377ms (1002 modules)
+ POST /api/profile/create 404 in 426ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:18:50.539Z',
+  userAgent: 'curl/8.7.1...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+ POST /api/profile/create 400 in 51ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:18:59.953Z',
+  userAgent: 'curl/8.7.1...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '711CB88D-9BB0-4087-B967-EE5043939CD4',
+  email: 'test@sit.ac.in'
+}
+Supabase insert error: {
+  code: '23505',
+  details: 'Key (usn)=(1SI20CS998) already exists.',
+  hint: null,
+  message: 'duplicate key value violates unique constraint "users_usn_key"'
+}
+Duplicate key detected, fetching existing profile...
+ POST /api/profile/create 409 in 1871ms
+ ✓ Compiled in 280ms (1016 modules)
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:19:38.438Z',
+  userAgent: 'curl/8.7.1...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '4B84F4B3-F851-4AF9-9BAC-DFDD5177F1A0',
+  email: 'test.new@sit.ac.in'
+}
+Profile created successfully: 7404d641-670b-4f7d-b101-370a74c39229
+ POST /api/profile/create 200 in 779ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:19:48.062Z',
+  userAgent: 'curl/8.7.1...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '4b84f4b3-f851-4af9-9bac-dfdd5177f1a0',
+  email: 'test.new@sit.ac.in'
+}
+Profile already exists, returning existing profile: 7404d641-670b-4f7d-b101-370a74c39229
+ POST /api/profile/create 200 in 840ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:19:58.259Z',
+  userAgent: 'node...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '9d6fb281-191b-422f-90db-5a15300763f0',
+  email: 'otp.test.1759828797230@sit.ac.in'
+}
+Profile created successfully: 7f833229-159a-4b99-b860-8138ae6c1df0
+ POST /api/profile/create 200 in 723ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/api/profile/create',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:19:58.989Z',
+  userAgent: 'node...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: false,
+  isAuthWhitelisted: true,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'WHITELIST_ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing whitelisted auth path: /api/profile/create
+Creating profile for user: {
+  auth_id: '9d6fb281-191b-422f-90db-5a15300763f0',
+  email: 'otp.test.1759828797230@sit.ac.in'
+}
+Profile already exists, returning existing profile: 7f833229-159a-4b99-b860-8138ae6c1df0
+ POST /api/profile/create 200 in 327ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/auth',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:19:59.321Z',
+  userAgent: 'test-client...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: true,
+  isAuthWhitelisted: false,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing request to proceed: /auth
+ ✓ Compiled /auth in 355ms (1109 modules)
+✅ Supabase client initialized successfully
+AuthFlow: State changed - {
+  loading: true,
+  isLoggedIn: false,
+  hasSession: false,
+  hasUser: false,
+  currentStep: 'signup',
+  isReady: false,
+  hasProfile: false,
+  profileCompleted: undefined
+}
+ GET /auth 200 in 462ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/auth/otp-verification',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:19:59.786Z',
+  userAgent: 'test-client...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: true,
+  isAuthWhitelisted: false,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing request to proceed: /auth/otp-verification
+ ✓ Compiled /_not-found in 59ms (1112 modules)
+✅ Supabase client initialized successfully
+ GET /auth/otp-verification 404 in 108ms
+🛡️ [TEMP] Middleware: Request details: {
+  pathname: '/auth/profile-creation',
+  hasSession: false,
+  sessionUser: 'No user',
+  sessionExpiry: 'No expiry',
+  timestamp: '2025-10-07T09:19:59.897Z',
+  userAgent: 'test-client...'
+}
+🛡️ [TEMP] Middleware: Route analysis: {
+  isProtectedRoute: false,
+  isAuthRoute: true,
+  isAuthWhitelisted: false,
+  isDummyAuth: false,
+  hasSession: false,
+  decision: 'ALLOW'
+}
+🛡️ [TEMP] Middleware: Allowing request to proceed: /auth/profile-creation
+ GET /auth/profile-creation 404 in 8ms
+[?25h

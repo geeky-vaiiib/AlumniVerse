@@ -168,11 +168,27 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
 
       const result = await response.json()
 
+      console.log('🔧 [TEMP] ProfileCreationFlow: API Response', { 
+        status: response.status, 
+        ok: response.ok,
+        message: result.message,
+        hasData: !!result.data 
+      })
+
+      // FIXED: Handle both success and "already exists" responses gracefully
       if (!response.ok) {
+        // Don't treat existing profile as an error if we got data back
+        if (response.status === 409 && result.data) {
+          console.log('🔧 [TEMP] ProfileCreationFlow: Profile exists, proceeding with existing data')
+          const existingProfile = result.data
+          onComplete(existingProfile)
+          return
+        }
+        
         throw new Error(result.error || 'Failed to create profile')
       }
 
-      console.log('Profile created successfully via API:', result)
+      console.log('🔧 [TEMP] ProfileCreationFlow: Profile operation successful:', result.message)
       
       // Call completion handler with server-created profile data
       const createdProfile = result.data || formData

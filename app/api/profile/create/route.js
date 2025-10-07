@@ -39,7 +39,26 @@ export async function POST(request) {
 
     console.log('Creating profile for user:', { auth_id, email })
 
-    // Insert profile using service role (bypasses RLS)
+    // FIXED: First check if profile already exists
+    const { data: existingProfile, error: checkError } = await supabaseAdmin
+      .from('users')
+      .select('*')
+      .eq('auth_id', auth_id)
+      .single()
+
+    if (existingProfile && !checkError) {
+      console.log('Profile already exists, returning existing profile:', existingProfile.id)
+      // Remove sensitive data from response
+      const { password_hash, ...profileData } = existingProfile
+      
+      return NextResponse.json({
+        success: true,
+        message: 'Profile already exists',
+        data: profileData
+      })
+    }
+
+    // Insert profile using service role (bypasses RLS) - only if doesn't exist
     const { data, error } = await supabaseAdmin
       .from('users')
       .insert({
@@ -64,10 +83,43 @@ export async function POST(request) {
     if (error) {
       console.error('Supabase insert error:', error)
       
-      // Handle duplicate key error
+      // Handle duplicate key error with idempotent response
       if (error.code === '23505') {
+        console.log('Duplicate key detected, analyzing conflict...')
+        
+        // Check if it's the same user (auth_id conflict)
+        if (error.message.includes('auth_id')) {
+          const { data: raceProfile, error: raceError } = await supabaseAdmin
+            .from('users')
+            .select('*')
+            .eq('auth_id', auth_id)
+            .single()
+          
+          if (raceProfile && !raceError) {
+            const { password_hash, ...profileData } = raceProfile
+            return NextResponse.json({
+              success: true,
+              message: 'Profile already exists',
+              data: profileData
+            })
+          }
+        }
+        
+        // If it's a USN conflict (different user), return appropriate error
+        if (error.message.includes('usn')) {
+          return NextResponse.json(
+            { 
+              success: false,
+              error: 'USN already exists for another user',
+              message: 'This University Seat Number is already registered by another user'
+            },
+            { status: 409 }
+          )
+        }
+        
+        // Other conflicts
         return NextResponse.json(
-          { error: 'Profile already exists for this user' },
+          { error: 'Profile conflict could not be resolved' },
           { status: 409 }
         )
       }

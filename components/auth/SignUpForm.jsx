@@ -24,6 +24,7 @@ export default function SignUpForm({ onStepChange }) {
   const [errors, setErrors] = useState({})
   const [isLoading, setIsLoading] = useState(false)
   const [submitCooldown, setSubmitCooldown] = useState(0)
+  const [userExistsCheck, setUserExistsCheck] = useState(null) // null, 'checking', 'exists', 'not-exists'
 
   // Cooldown timer effect
   useEffect(() => {
@@ -145,6 +146,26 @@ export default function SignUpForm({ onStepChange }) {
     setErrors({})
 
     try {
+      // STEP 1: Check if user already exists before sending OTP
+      console.log('🔍 [TEMP] Checking if user exists before OTP send:', formData.email)
+      setUserExistsCheck('checking')
+      
+      const existsResponse = await fetch(`/api/user/exists?email=${encodeURIComponent(formData.email.trim().toLowerCase())}`)
+      const existsData = await existsResponse.json()
+      
+      if (existsData.exists) {
+        setUserExistsCheck('exists')
+        setErrors({ 
+          email: "An account already exists for this email.",
+          submit: "Please use 'Login with OTP' or 'Login with Password' instead of signing up."
+        })
+        setIsLoading(false)
+        return
+      }
+      
+      setUserExistsCheck('not-exists')
+      console.log('✅ [TEMP] User does not exist, proceeding with signup')
+
       // Prepare metadata from extracted USN data
       const metadata = {
         first_name: formData.firstName.trim(),

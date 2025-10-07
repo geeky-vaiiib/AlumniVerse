@@ -18,6 +18,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
   const [isReady, setIsReady] = useState(false)
+  const [authReady, setAuthReady] = useState(false)
 
   useEffect(() => {
     let mounted = true
@@ -232,7 +233,10 @@ export function AuthProvider({ children }) {
         type: 'email'
       })
 
-      if (error) throw error
+      if (error) {
+        console.error('🔐 [TEMP] AuthProvider: OTP verification failed', error)
+        throw error
+      }
 
       const session = data?.session ?? null
       const user = session?.user ?? null
@@ -409,6 +413,7 @@ export function AuthProvider({ children }) {
     session,
     loading,
     isReady,
+    authReady,
     isLoggedIn: !!session,
     signUpWithOTP,
     signInWithOTP,

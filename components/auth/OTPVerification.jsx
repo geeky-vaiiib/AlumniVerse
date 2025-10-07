@@ -8,6 +8,7 @@ import { Input } from "../ui/input"
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react"
 import { useAuth } from "../providers/AuthProvider"
 import { useToast } from "../../hooks/use-toast"
+import { supabase } from "../../lib/supabaseClient"
 
 export default function OTPVerification({
   email,
@@ -137,6 +138,7 @@ export default function OTPVerification({
       })
 
       if (!authError && data && data.user) {
+        console.log('🔐 [TEMP] OTPVerification: OTP verification successful')
         setSuccess("✅ Email verified successfully!")
 
         // Show success toast
@@ -146,10 +148,31 @@ export default function OTPVerification({
           variant: "default",
         })
 
-        // Small delay to show success message
-        setTimeout(() => {
-          console.log('🔐 [TEMP] OTPVerification: Initiating redirect', { isSignUp })
-          console.log('OTP verification successful')
+        // ENHANCED: Wait for session to be properly established
+        const waitForSession = async () => {
+          console.log('🔐 [TEMP] OTPVerification: Waiting for session establishment...')
+          
+          for (let attempt = 0; attempt < 5; attempt++) {
+            try {
+              const { data: { session } } = await supabase.auth.getSession()
+              if (session) {
+                console.log('🔐 [TEMP] OTPVerification: Session established successfully')
+                return session
+              }
+              console.log(`🔐 [TEMP] OTPVerification: Session attempt ${attempt + 1}/5 - waiting...`)
+              await new Promise(resolve => setTimeout(resolve, 800)) // Wait 800ms between attempts
+            } catch (err) {
+              console.warn('🔐 [TEMP] OTPVerification: Session check error:', err)
+            }
+          }
+          
+          console.warn('🔐 [TEMP] OTPVerification: Session not established after retries')
+          return null
+        }
+
+        try {
+          const session = await waitForSession()
+          
           // Clear any pending session storage
           sessionStorage.removeItem('pendingVerificationEmail')
           sessionStorage.removeItem('pendingFirstName')
@@ -159,9 +182,9 @@ export default function OTPVerification({
           sessionStorage.removeItem('pendingJoiningYear')
           sessionStorage.removeItem('pendingPassingYear')
           
+          console.log('🔐 [TEMP] OTPVerification: Initiating redirect', { isSignUp, hasSession: !!session })
+          
           // FIXED: Use router navigation instead of hard window.location redirect
-          // This prevents middleware redirect loops and preserves SPA state
-          console.log('🔐 [TEMP] OTPVerification: Using router.push instead of window.location')
           if (isSignUp) {
             // For new signups, go to profile creation
             console.log('🔐 [TEMP] OTPVerification: Redirecting to profile creation')
@@ -171,7 +194,10 @@ export default function OTPVerification({
             console.log('🔐 [TEMP] OTPVerification: Redirecting to dashboard')
             router.push('/dashboard')
           }
-        }, 1500)
+        } catch (redirectError) {
+          console.error('🔐 [TEMP] OTPVerification: Redirect error:', redirectError)
+          setError("Verification successful but redirect failed. Please refresh the page.")
+        }
       } else {
         setVerifyAttempts(prev => prev + 1)
         setError(authError?.message || "Verification failed. Please check your code and try again.")
@@ -206,24 +232,44 @@ export default function OTPVerification({
         return
       }
 
+      console.log('🔄 [TEMP] OTPVerification: Attempting to resend OTP')
+
       const { data, error } = isSignUp
         ? await signUpWithOTP(email, userData)
         : await signInWithOTP(email)
 
       if (!error && data) {
+        console.log('✅ [TEMP] OTPVerification: OTP resent successfully')
         setSuccess("✅ New code sent to your email!")
-        setTimer(60)
+        setTimer(60) // Reset general timer
         setCanResend(false)
         setVerifyAttempts(0) // Reset attempts on resend
 
         // Clear success message after 3 seconds
         setTimeout(() => setSuccess(""), 3000)
       } else {
-        setError(error?.message || "Failed to resend code. Please try again.")
+        console.error('🔄 [TEMP] OTPVerification: Resend failed:', error)
+        
+        // Handle specific rate limit error (429 / 12 second rule)
+        if (error?.status === 429 || error?.message?.includes('security purposes') || error?.message?.includes('12 seconds')) {
+          setError("For security purposes, you can only request this after 12 seconds.")
+          setTimer(12) // Set 12-second cooldown
+          setCanResend(false)
+        } else {
+          setError(error?.message || "Failed to resend code. Please try again.")
+        }
       }
     } catch (error) {
       console.error('Resend OTP error:', error)
-      setError("Failed to resend code. Please try again.")
+      
+      // Check if it's a rate limit error
+      if (error?.message?.includes('security purposes') || error?.message?.includes('12 seconds')) {
+        setError("For security purposes, you can only request this after 12 seconds.")
+        setTimer(12)
+        setCanResend(false)
+      } else {
+        setError("Failed to resend code. Please try again.")
+      }
     } finally {
       setIsResending(false)
     }
