@@ -16,14 +16,18 @@ export async function middleware(request) {
 
   const url = request.nextUrl.clone()
   
-  // Add comprehensive logging for debugging
-  console.log('🛡️ [TEMP] Middleware: Request details:', {
+  // DIAGNOSTIC: Enhanced logging for debugging redirect loop
+  console.log('🛡️ [MIDDLEWARE] ===== REQUEST START =====')
+  console.log('🛡️ [MIDDLEWARE] path:', url.pathname, 'query:', url.search)
+  console.log('🛡️ [MIDDLEWARE] server session present?', !!session, 'session.user?.id=', session?.user?.id ?? null)
+  console.log('🛡️ [MIDDLEWARE] cookies:', request.cookies.getAll().map(c => c.name).join(', '))
+  console.log('🛡️ [MIDDLEWARE] Request details:', {
     pathname: url.pathname,
     hasSession: !!session,
     sessionUser: session?.user?.email || 'No user',
-    sessionExpiry: session?.expires_at ? new Date(session.expires_at * 1000).toISOString() : 'No expiry',
+    searchParams: url.searchParams.toString(),
     timestamp: new Date().toISOString(),
-    userAgent: request.headers.get('user-agent')?.substring(0, 50) + '...'
+    userAgent: request.headers.get('user-agent')?.substring(0, 30) + '...'
   })
   
   // Define protected routes
@@ -45,7 +49,7 @@ export async function middleware(request) {
   // Check for dummy authentication bypass
   const isDummyAuth = request.cookies.get('dummy-auth-verified')?.value === 'true'
 
-  console.log('🛡️ [TEMP] Middleware: Route analysis:', {
+  console.log('🛡️ [MIDDLEWARE] Route analysis:', {
     isProtectedRoute,
     isAuthRoute,
     isAuthWhitelisted,
@@ -58,26 +62,34 @@ export async function middleware(request) {
 
   // Always allow whitelisted auth paths to prevent interrupting auth flows
   if (isAuthWhitelisted) {
-    console.log('🛡️ [TEMP] Middleware: Allowing whitelisted auth path:', url.pathname)
+    console.log('🛡️ [MIDDLEWARE] Allowing whitelisted auth path:', url.pathname)
     return supabaseResponse
   }
 
   // If user is not authenticated and trying to access protected route
   if (isProtectedRoute && !session && !isDummyAuth) {
-    console.log('🛡️ [TEMP] Middleware: Redirecting unauthenticated user to auth:', url.pathname)
+    console.log('🛡️ [MIDDLEWARE] Redirecting unauthenticated user to auth:', url.pathname)
     const redirectUrl = new URL('/auth', request.url)
     redirectUrl.searchParams.set('redirectTo', url.pathname)
     return NextResponse.redirect(redirectUrl)
   }
 
-  // If user is authenticated and trying to access auth route
+  // CRITICAL FIX: Only redirect authenticated users from auth route if they're NOT actively in an auth flow
   if (isAuthRoute && session) {
-    const redirectTo = url.searchParams.get('redirectTo') || '/dashboard'
-    console.log('🛡️ [TEMP] Middleware: Redirecting authenticated user from auth to:', redirectTo)
+    const redirectTo = url.searchParams.get('redirectTo')
+    
+    // Don't redirect if there's no redirectTo parameter - let the user stay on auth page
+    // This prevents the infinite loop when coming from profile completion
+    if (!redirectTo) {
+      console.log('🛡️ [MIDDLEWARE] Authenticated user on auth page with no redirectTo, allowing')
+      return supabaseResponse
+    }
+    
+    console.log('🛡️ [MIDDLEWARE] Redirecting authenticated user from auth to:', redirectTo)
     return NextResponse.redirect(new URL(redirectTo, request.url))
   }
 
-  console.log('🛡️ [TEMP] Middleware: Allowing request to proceed:', url.pathname)
+  console.log('🛡️ [MIDDLEWARE] Allowing request to proceed:', url.pathname)
   return supabaseResponse
 }
 

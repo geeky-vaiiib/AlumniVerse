@@ -73,26 +73,42 @@ export function UserProvider({ children }) {
   // Fetch user profile from Supabase
   useEffect(() => {
     async function fetchUserProfile() {
-      if (!user || !isLoggedIn) {
-        setUserProfile(null)
-        setLoading(false)
+      console.log("[DEBUG][TIME]", new Date().toISOString(), "UserContext fetchUserProfile triggered:", { 
+        hasUser: !!user, 
+        userId: user?.id,
+        isLoggedIn,
+        hasSession: !!session,
+        userEmail: user?.email
+      })
+      
+      // CRITICAL FIX: Wait for session stabilization, don't clear profile yet
+      if (!session?.user) {
+        console.log("[USER_CONTEXT] Waiting for session stabilization...")
+        return
+      }
+      
+      // CRITICAL FIX: Prevent repeated re-fetching for same user
+      if (userProfile?.id === session.user.id) {
+        console.log("[USER_CONTEXT] Profile already loaded for user:", session.user.id)
         return
       }
 
       try {
         setLoading(true)
-        console.log('UserContext: Fetching profile for user:', user.id)
+        console.log('🔐 [USER_CONTEXT] Fetching profile for user:', user.id)
 
         // Get user metadata from auth
         const authMetadata = user.user_metadata || {}
         
-        console.log('UserContext: Auth metadata:', authMetadata)
+        console.log('🔐 [USER_CONTEXT] Auth metadata:', authMetadata)
 
         // Try to fetch from users table safely (handles duplicates)
         const { data: dbProfile, error: dbError } = await getDbProfileByAuthId(user.id)
         if (dbError) {
-          console.error('UserContext: Database error:', dbError)
+          console.error('🔐 [USER_CONTEXT] Database error:', dbError)
         }
+
+        console.log('🔐 [USER_CONTEXT] Database profile:', dbProfile)
 
         // Merge auth metadata with database profile
         const profile = {
@@ -136,19 +152,21 @@ export function UserProvider({ children }) {
           updatedAt: dbProfile?.updated_at || new Date().toISOString()
         }
 
-        console.log('UserContext: Merged profile:', profile)
+        console.log('🔐 [USER_CONTEXT] Merged profile:', profile)
         setUserProfile(profile)
         setError(null)
+        console.log('🔐 [USER_CONTEXT] Profile state updated successfully')
       } catch (err) {
-        console.error('UserContext: Error fetching profile:', err)
+        console.error('🔐 [USER_CONTEXT] Error fetching profile:', err)
         setError(err.message)
       } finally {
         setLoading(false)
+        console.log('🔐 [USER_CONTEXT] fetchUserProfile completed, loading set to false')
       }
     }
 
     fetchUserProfile()
-  }, [user, isLoggedIn])
+  }, [user, session, userProfile?.id]) // Add session to deps, add userProfile.id to prevent loops
 
   // Refresh user profile data
   const refreshProfile = async () => {

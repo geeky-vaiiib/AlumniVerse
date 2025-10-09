@@ -23,8 +23,11 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     let mounted = true
 
+    console.log('🔐 [AUTH_PROVIDER] Initializing AuthProvider')
+    
     // Set ready immediately for auth operations
     setIsReady(true)
+    setAuthReady(true)
     setLoading(false)
 
     // Test Supabase connection (non-blocking)
@@ -151,31 +154,39 @@ export function AuthProvider({ children }) {
     // Initialize session
     getInitialSession()
 
-        // Listen for auth changes with profile handling
+    // Listen for auth changes with profile handling
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (mounted) {
-          setLoading(true)
-          console.log('🔐 [TEMP] AuthProvider: Auth state change', { 
-            event, 
-            userEmail: session?.user?.email,
-            userId: session?.user?.id,
-            hasSession: !!session,
-            timestamp: new Date().toISOString()
-          })
-          setSession(session)
-          setUser(session?.user ?? null)
-          
-          // Handle profile creation for new sessions
-          if (event === 'SIGNED_IN' && session?.user?.id) {
-            console.log('🔐 [TEMP] AuthProvider: Triggering profile fetch/create for new session')
-            await fetchOrCreateProfile(session.user.id, session.user.email)
-          }
-          
-          setLoading(false)
-          setIsReady(true)
-          console.log('🔐 [TEMP] AuthProvider: State update complete', { loading: false, isReady: true })
+        if (!mounted) return
+        
+        console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthProvider onAuthStateChange:", {
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id,
+          userEmail: session?.user?.email
+        })
+        
+        // CRITICAL FIX: Don't clear session during transitions
+        if (!session && event !== 'SIGNED_OUT') {
+          console.log("[DEBUG] Preventing session clear during transition, event:", event)
+          return
         }
+        
+        setLoading(true)
+        setSession(session)
+        setUser(session?.user ?? null)
+        
+        // Handle profile creation for new sessions
+        if (event === 'SIGNED_IN' && session?.user?.id) {
+          console.log('[AUTH_PROVIDER] SIGNED_IN event - triggering profile fetch/create')
+          await fetchOrCreateProfile(session.user.id, session.user.email)
+        }
+        
+        setLoading(false)
+        setIsReady(true)
+        setAuthReady(true)
+        
+        console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthReady:", true, "Session:", !!session, "User:", !!session?.user)
       }
     )
 

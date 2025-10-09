@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+#!/usr/binconst BASE_URL = 'http://localhost:3001'env node
 /**
  * Test OTP verification and profile creation flow
  * Tests the specific fixes we implemented for the redirect loops

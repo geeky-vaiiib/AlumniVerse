@@ -14,19 +14,39 @@ import { useToast } from "../../hooks/use-toast"
 
 export default function AuthFlow({ initialStep = 'login' }) {
   const router = useRouter()
-  const { session, loading, isLoggedIn, isReady } = useAuth()
+  const { session, loading, isLoggedIn, isReady, authReady } = useAuth()
   const { updateProfile, userProfile } = useUser()
   const [currentStep, setCurrentStep] = useState(initialStep)
   const [authData, setAuthData] = useState({})
   const { toast } = useToast()
-  const [hasRedirected, setHasRedirected] = useState(false)
+  const [redirectTriggered, setRedirectTriggered] = useState(false)
+
+  // Add wait gate before pushing to dashboard
+  useEffect(() => {
+    console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthFlow redirect check:", {
+      authReady,
+      hasSession: !!session,
+      hasProfile: !!userProfile,
+      redirectTriggered,
+      currentStep
+    })
+    
+    if (authReady && session && userProfile && !redirectTriggered && currentStep !== 'otp-verification' && currentStep !== 'profile') {
+      const urlParams = new URLSearchParams(window.location.search)
+      const redirectTo = urlParams.get('redirectTo') || '/dashboard'
+      
+      console.log("[AUTH_FLOW] ✅ Redirecting to dashboard...", redirectTo)
+      setRedirectTriggered(true)
+      setTimeout(() => router.replace(redirectTo), 500)
+    }
+  }, [authReady, session, userProfile, redirectTriggered, currentStep, router])
 
   // Only log state changes, not every render
   const stateKey = `${loading}-${isLoggedIn}-${!!session}-${currentStep}-${isReady}`
   const [lastStateKey, setLastStateKey] = useState('')
   
   if (stateKey !== lastStateKey) {
-    console.log('AuthFlow: State changed -', {
+    console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthFlow state changed:", {
       loading,
       isLoggedIn,
       hasSession: !!session,
@@ -39,48 +59,7 @@ export default function AuthFlow({ initialStep = 'login' }) {
     setLastStateKey(stateKey)
   }
 
-  // Handle redirect with URL parameters - ONLY when authenticated
-  useEffect(() => {
-    // Wait for auth to be ready before attempting redirects
-    if (!isReady || loading) {
-      console.log('AuthFlow: Waiting for auth to be ready...', { isReady, loading })
-      return
-    }
-
-    if (hasRedirected) return // Prevent multiple redirects
-
-    // Get redirect URL from search params
-    const urlParams = new URLSearchParams(window.location.search)
-    const redirectTo = urlParams.get('redirectTo') || null
-    
-    // CRITICAL: Only redirect if user is actually authenticated
-    const isAuthenticated = !!(session?.user || isLoggedIn)
-    
-    console.log('AuthFlow: Auth check effect triggered', { 
-      isLoggedIn, 
-      hasSession: !!session, 
-      isAuthenticated,
-      currentStep,
-      redirectTo,
-      isReady,
-      hasProfile: !!userProfile
-    })
-
-    // If user is authenticated and there's a redirect target
-    if (isAuthenticated && redirectTo) {
-      // Don't redirect if we're in the OTP verification step (let it complete naturally)
-      if (currentStep === 'otp-verification') {
-        console.log('AuthFlow: In OTP verification, skipping redirect')
-        return
-      }
-      
-      // Redirect authenticated user away from auth page
-      console.log('🔐 [TEMP] AuthFlow: User authenticated, redirecting to:', redirectTo)
-      setHasRedirected(true)
-      // FIXED: Use router navigation instead of hard redirect to prevent middleware loops
-      router.push(redirectTo)
-    }
-  }, [session, isLoggedIn, currentStep, isReady, loading, hasRedirected, userProfile])
+  // Remove the old redirect effect - replaced with the new wait gate above
 
   const handleStepChange = (step, data = {}) => {
     console.log('Step change:', step, data)
@@ -89,25 +68,19 @@ export default function AuthFlow({ initialStep = 'login' }) {
   }
 
   const handleProfileComplete = async (profileData) => {
-    console.log('🔐 [TEMP] AuthFlow: Profile creation completed:', profileData)
+    console.log("[DEBUG][TIME]", new Date().toISOString(), "Profile creation completed:", profileData)
 
     try {
       // Profile was already created via API in ProfileCreationFlow
-      // Just redirect to dashboard
-      console.log('🔐 [TEMP] AuthFlow: Profile saved successfully')
+      console.log('[PROFILE_FLOW] Profile operation successful')
 
       // Store profile data in local state
       setAuthData(prev => ({ ...prev, profile: profileData }))
 
-      // Get redirect URL from search params
-      const urlParams = new URLSearchParams(window.location.search)
-      const redirectTo = urlParams.get('redirectTo') || '/dashboard'
-
-      // FIXED: Use router navigation instead of hard redirect
-      console.log('🔐 [TEMP] AuthFlow: Profile completed, using router.push to:', redirectTo)
-      router.push(redirectTo)
+      // The new wait gate effect above will handle the redirect
+      // No need to manually redirect here
     } catch (error) {
-      console.error('🔐 [TEMP] AuthFlow: Error saving profile:', error)
+      console.error('🔐 [AUTH_FLOW] Error saving profile:', error)
       // Show error and stay on the profile page to allow retry
       toast({
         title: 'Failed to save profile',

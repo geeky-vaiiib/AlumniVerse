@@ -140,6 +140,8 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
     
     setIsLoading(true)
     try {
+      console.log('🔧 [PROFILE_FLOW] Starting profile creation...')
+      
       // Create profile via API endpoint
       const response = await fetch('/api/profile/create', {
         method: 'POST',
@@ -168,7 +170,7 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
 
       const result = await response.json()
 
-      console.log('🔧 [TEMP] ProfileCreationFlow: API Response', { 
+      console.log('🔧 [PROFILE_FLOW] API Response:', { 
         status: response.status, 
         ok: response.ok,
         message: result.message,
@@ -179,8 +181,12 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
       if (!response.ok) {
         // Don't treat existing profile as an error if we got data back
         if (response.status === 409 && result.data) {
-          console.log('🔧 [TEMP] ProfileCreationFlow: Profile exists, proceeding with existing data')
+          console.log('🔧 [PROFILE_FLOW] Profile exists, proceeding with existing data')
           const existingProfile = result.data
+          
+          // CRITICAL: Wait a moment for the session to fully settle before calling onComplete
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
           onComplete(existingProfile)
           return
         }
@@ -188,13 +194,16 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
         throw new Error(result.error || 'Failed to create profile')
       }
 
-      console.log('🔧 [TEMP] ProfileCreationFlow: Profile operation successful:', result.message)
+      console.log('🔧 [PROFILE_FLOW] Profile operation successful:', result.message)
+      
+      // CRITICAL: Wait a moment for the session to fully settle before calling onComplete
+      await new Promise(resolve => setTimeout(resolve, 500))
       
       // Call completion handler with server-created profile data
       const createdProfile = result.data || formData
       onComplete(createdProfile)
     } catch (error) {
-      console.error('Profile creation failed:', error)
+      console.error('🔧 [PROFILE_FLOW] Profile creation failed:', error)
       setErrors({ submit: error.message || 'Failed to create profile. Please try again.' })
     } finally {
       setIsLoading(false)
