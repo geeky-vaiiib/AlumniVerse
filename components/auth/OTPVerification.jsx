@@ -141,12 +141,8 @@ export default function OTPVerification({
         console.log('🔐 [TEMP] OTPVerification: OTP verification successful')
         setSuccess("✅ Email verified successfully!")
 
-        // Show success toast
-        toast({
-          title: "Verification Successful! 🎉",
-          description: "Your email has been verified. Redirecting...",
-          variant: "default",
-        })
+        // Don't show toast here - let AuthFlow handle it
+        // This prevents toast from getting stuck
 
         // ENHANCED: Wait for session to be properly established
         const waitForSession = async () => {
@@ -182,17 +178,25 @@ export default function OTPVerification({
           sessionStorage.removeItem('pendingJoiningYear')
           sessionStorage.removeItem('pendingPassingYear')
           
-          console.log('🔐 [TEMP] OTPVerification: Initiating redirect', { isSignUp, hasSession: !!session })
+          console.log('🔐 [TEMP] OTPVerification: Initiating next step', { isSignUp, hasSession: !!session })
           
-          // FIXED: Use router navigation instead of hard window.location redirect
+          // Dismiss all toasts before step change
+          if (toast?.dismiss) {
+            toast.dismiss()
+          }
+          
+          // Small delay to ensure toast is dismissed
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+          // FIXED: Let AuthFlow handle all redirects - just change step here
           if (isSignUp) {
             // For new signups, go to profile creation
-            console.log('🔐 [TEMP] OTPVerification: Redirecting to profile creation')
+            console.log('🔐 [TEMP] OTPVerification: Moving to profile creation step')
             onStepChange('profile', { email, firstName, lastName, isSignUp, userData })
           } else {
-            // For existing users (login), go directly to dashboard
-            console.log('🔐 [TEMP] OTPVerification: Redirecting to dashboard')
-            router.push('/dashboard')
+            // For existing users (login), signal completion to AuthFlow
+            console.log('🔐 [TEMP] OTPVerification: Signaling login completion to AuthFlow')
+            onStepChange('login-complete', { email, firstName, lastName, isSignUp: false, userData })
           }
         } catch (redirectError) {
           console.error('🔐 [TEMP] OTPVerification: Redirect error:', redirectError)

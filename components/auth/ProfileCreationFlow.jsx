@@ -10,6 +10,7 @@ import { Progress } from "../ui/progress"
 import { Upload, User, Briefcase, Award, ArrowLeft, ArrowRight, Check } from "lucide-react"
 import { parseInstitutionalEmail } from "../../lib/utils/emailParser"
 import { useAuth } from "../providers/AuthProvider"
+import { supabase } from "../../lib/supabaseClient"
 
 const STEPS = [
   { id: 1, title: "Basic Information", icon: User },
@@ -140,17 +141,23 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
     
     setIsLoading(true)
     try {
-      console.log('🔧 [PROFILE_FLOW] Starting profile creation...')
+      console.log('🔧 [PROFILE_FLOW] Starting profile completion...')
       
-      // Create profile via API endpoint
-      const response = await fetch('/api/profile/create', {
+      // Get the current session token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session) {
+        throw new Error('Not authenticated. Please log in again.')
+      }
+
+      // 🔧 FIX: Use dedicated /api/profile/complete endpoint
+      const response = await fetch('/api/profile/complete', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`  // ✅ Include auth token
         },
         body: JSON.stringify({
-          auth_id: user?.id,
-          email: formData.email,
           first_name: formData.firstName,
           last_name: formData.lastName,
           usn: formData.usn,
@@ -162,9 +169,10 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
           location: formData.location,
           linkedin_url: formData.linkedinUrl,
           github_url: formData.githubUrl,
+          leetcode_url: formData.leetcodeUrl,
           bio: formData.bio,
           skills: formData.skills,
-          profile_completed: true
+          resume_url: formData.resumeUrl
         })
       })
 
@@ -174,39 +182,58 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
         status: response.status, 
         ok: response.ok,
         message: result.message,
-        hasData: !!result.data 
+        hasData: !!result.data,
+        isProfileComplete: result.data?.isProfileComplete 
       })
 
-      // FIXED: Handle both success and "already exists" responses gracefully
+      // ✅ Check for success response
       if (!response.ok) {
-        // Don't treat existing profile as an error if we got data back
-        if (response.status === 409 && result.data) {
-          console.log('🔧 [PROFILE_FLOW] Profile exists, proceeding with existing data')
-          const existingProfile = result.data
-          
-          // CRITICAL: Wait a moment for the session to fully settle before calling onComplete
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-          onComplete(existingProfile)
-          return
-        }
-        
-        throw new Error(result.error || 'Failed to create profile')
+        throw new Error(result.error || result.message || 'Failed to complete profile')
       }
 
-      console.log('🔧 [PROFILE_FLOW] Profile operation successful:', result.message)
+      // ✅ Verify profile is marked as complete
+      if (!result.success || !result.data?.isProfileComplete) {
+        throw new Error('Profile was not marked as complete on server')
+      }
+
+      console.log('[PROFILE_FLOW] 🎉 Profile completed successfully on server')
       
-      // CRITICAL: Wait a moment for the session to fully settle before calling onComplete
+      // Update auth metadata to mark profile as completed
+      await updateUserMetadata({ 
+        profileCompleted: true,
+        first_name: formData.firstName,
+        last_name: formData.lastName
+      })
+      
+      console.log('[PROFILE_FLOW] ✅ Calling onComplete with completed profile')
+      
+      // ✅ Wait for state to settle before redirect
       await new Promise(resolve => setTimeout(resolve, 500))
       
-      // Call completion handler with server-created profile data
-      const createdProfile = result.data || formData
-      onComplete(createdProfile)
+      // Call completion handler with server response
+      onComplete(result.data.user)
     } catch (error) {
-      console.error('🔧 [PROFILE_FLOW] Profile creation failed:', error)
-      setErrors({ submit: error.message || 'Failed to create profile. Please try again.' })
+      console.error('🔧 [PROFILE_FLOW] Profile completion failed:', error)
+      setErrors({ submit: error.message || 'Failed to complete profile. Please try again.' })
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  // Helper function to update user metadata
+  const updateUserMetadata = async (metadata) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          ...user?.user_metadata,
+          ...metadata
+        }
+      })
+      if (error) {
+        console.warn('Failed to update user metadata:', error)
+      }
+    } catch (err) {
+      console.warn('Error updating user metadata:', err)
     }
   }
 

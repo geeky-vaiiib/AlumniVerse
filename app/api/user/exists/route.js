@@ -4,7 +4,13 @@ import { NextResponse } from 'next/server'
 // Create Supabase admin client with service role key
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false,
+    },
+  }
 )
 
 export async function GET(request) {
@@ -19,30 +25,37 @@ export async function GET(request) {
       )
     }
 
-    console.log('🔍 [TEMP] Checking user existence for:', email)
+    console.log('🔍 [USER_EXISTS] Checking user existence for:', email)
 
-    // Check if user exists in Supabase Auth
-    const { data, error } = await supabaseAdmin.auth.admin.getUserByEmail(email)
+    // Check if user exists in Supabase Auth using v2 API
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers()
 
-    if (error && error.message !== 'User not found') {
-      console.error('Error checking user existence:', error)
+    if (error) {
+      console.error('❌ [USER_EXISTS] Error listing users:', error.message)
       return NextResponse.json(
         { error: 'Failed to check user existence' },
         { status: 500 }
       )
     }
 
-    const exists = !error && data?.user
-    
-    console.log('🔍 [TEMP] User existence result:', { email, exists: !!exists })
+    // Find user by email in the returned users list
+    const user = data.users?.find(u => u.email === email)
+    const exists = !!user
+
+    console.log('🔍 [USER_EXISTS] User existence result:', { email, exists })
 
     return NextResponse.json({
-      exists: !!exists,
-      email
+      exists,
+      user: exists ? {
+        id: user.id,
+        email: user.email,
+        email_confirmed_at: user.email_confirmed_at,
+        created_at: user.created_at
+      } : null
     })
 
   } catch (err) {
-    console.error('API Error:', err)
+    console.error('❌ [USER_EXISTS] API Error:', err.message)
     return NextResponse.json(
       { error: 'Internal Server Error' },
       { status: 500 }

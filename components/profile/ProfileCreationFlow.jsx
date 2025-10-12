@@ -284,6 +284,8 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
     setIsLoading(true)
 
     try {
+      console.log('🔧 [PROFILE_FLOW] Starting profile completion...')
+      
       // Import supabase client
       const { createClient } = await import('@supabase/supabase-js')
       const supabase = createClient(
@@ -291,83 +293,81 @@ export default function ProfileCreationFlow({ userData, onComplete }) {
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
       )
 
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      // Get current user and session
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
       
-      if (userError || !user) {
+      if (sessionError || !session) {
         setErrors({ submit: 'Authentication error. Please log in again.' })
         return
       }
 
-      // Prepare profile data
-      const profileData = {
-        first_name: formData.firstName,
-        last_name: formData.lastName,
-        usn: formData.usn || userData?.userData?.usn || '',
-        branch: formData.branch,
-        joining_year: formData.joiningYear || userData?.userData?.joining_year || null,
-        passing_year: parseInt(formData.yearOfPassing),
-        branch_code: userData?.userData?.branch_code || '',
-        currentCompany: formData.currentCompany,
-        designation: formData.designation,
-        location: formData.location,
-        linkedinUrl: formData.linkedinUrl,
-        githubUrl: formData.githubUrl,
-        leetcodeUrl: formData.leetcodeUrl,
-        resumeUrl: formData.resumeUrl,
-        profileCompleted: true,
-        profileCompletion: 100
-      }
-
-      // Update user metadata with profile data
-      const { data, error } = await supabase.auth.updateUser({
-        data: profileData
-      })
-
-      if (error) {
-        console.error('Profile update error:', error)
-        setErrors({ submit: error.message || 'Failed to update profile' })
-        return
-      }
-
-      // Also save to users table in database with proper null handling
-      const { error: dbError } = await supabase
-        .from('users')
-        .upsert({
-          auth_id: user.id,
-          email: user.email,
-          first_name: formData.firstName || null,
-          last_name: formData.lastName || null,
+      // 🔧 FIX: Use dedicated /api/profile/complete endpoint
+      const response = await fetch('/api/profile/complete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`  // ✅ Include auth token
+        },
+        body: JSON.stringify({
+          first_name: formData.firstName,
+          last_name: formData.lastName,
           usn: formData.usn || userData?.userData?.usn || null,
-          branch: formData.branch || null,
+          branch: formData.branch,
+          branch_code: userData?.userData?.branch_code || null,
           admission_year: formData.joiningYear || userData?.userData?.joining_year || null,
           passing_year: formData.yearOfPassing ? parseInt(formData.yearOfPassing) : null,
           company: formData.currentCompany || null,
           current_position: formData.designation || null,
           location: formData.location || null,
-          // Handle URL fields - validate and send null instead of empty strings to satisfy CHECK constraints
           linkedin_url: validateLinkedInUrl(formData.linkedinUrl),
           github_url: validateGitHubUrl(formData.githubUrl),
           leetcode_url: validateLeetCodeUrl(formData.leetcodeUrl),
-          resume_url: (formData.resumeUrl && formData.resumeUrl.trim()) ? formData.resumeUrl.trim() : null,
-          profile_completed: true,
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'auth_id'
+          resume_url: (formData.resumeUrl && formData.resumeUrl.trim()) ? formData.resumeUrl.trim() : null
         })
+      })
 
-      if (dbError) {
-        console.error('Database profile save error:', dbError)
-        setErrors({ submit: dbError.message || 'Failed to save profile to database' })
-        return
+      const result = await response.json()
+
+      console.log('🔧 [PROFILE_FLOW] API Response:', { 
+        status: response.status, 
+        ok: response.ok,
+        message: result.message,
+        hasData: !!result.data,
+        isProfileComplete: result.data?.isProfileComplete 
+      })
+
+      // ✅ Check for success response
+      if (!response.ok) {
+        throw new Error(result.error || result.message || 'Failed to complete profile')
       }
+
+      // ✅ Verify profile is marked as complete
+      if (!result.success || !result.data?.isProfileComplete) {
+        throw new Error('Profile was not marked as complete on server')
+      }
+
+      console.log('[PROFILE_FLOW] 🎉 Profile completed successfully on server')
+
+      // Update user metadata
+      await supabase.auth.updateUser({
+        data: {
+          profileCompleted: true,
+          first_name: formData.firstName,
+          last_name: formData.lastName
+        }
+      })
 
       // Clear draft from localStorage
       localStorage.removeItem('profileCreationDraft')
       
-      // Call completion handler with updated user data
+      console.log('[PROFILE_FLOW] ✅ Calling onComplete with completed profile')
+      
+      // ✅ Wait for state to settle before redirect
+      await new Promise(resolve => setTimeout(resolve, 500))
+      
+      // Call completion handler with server response
       if (onComplete) {
-        onComplete(data.user)
+        onComplete(result.data.user)
       } else {
         // Fallback redirect
         window.location.href = '/dashboard'

@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import DashboardSidebar from "./DashboardSidebar"
 import MainFeed from "./MainFeed"
 import RightSidebar from "./RightSidebar"
@@ -8,6 +8,11 @@ import RightSidebar from "./RightSidebar"
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("feed")
   const [posts, setPosts] = useState([])
+  
+  // ✅ Confirmation log that dashboard mounted successfully
+  useEffect(() => {
+    console.log("[DASHBOARD] ✅ Dashboard mounted successfully, user session stable")
+  }, [])
 
   const handleAddPost = (newPost) => {
     setPosts(prevPosts => [newPost, ...prevPosts])

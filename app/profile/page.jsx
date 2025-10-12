@@ -1,8 +1,9 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useEffect, useState, useRef } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "../../components/providers/AuthProvider"
+import { useUser } from "../../contexts/UserContext"
 import Navbar from "../../components/Navbar"
 import { Card, CardContent, CardHeader, CardTitle } from "../../components/ui/card"
 import { Button } from "../../components/ui/button"
@@ -10,20 +11,104 @@ import { User, Mail, Building, MapPin, Briefcase, GraduationCap, Github, Linkedi
 
 export default function ProfilePage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { user, session, loading } = useAuth()
+  const { userProfile, loading: profileLoading } = useUser()
   const [isChecking, setIsChecking] = useState(true)
+  const [isHydrated, setIsHydrated] = useState(false)
+  const [isNavigating, setIsNavigating] = useState(false)
+  
+  // 🔧 CRITICAL FIX: Ref to prevent infinite loop from useSearchParams dependency
+  const cleanedRef = useRef(false)
+  const hasAutoRedirectedRef = useRef(false)
 
+  // 🔧 FIX 1: Hydration check - ensures React tree is mounted
   useEffect(() => {
-    if (!loading) {
+    console.log('[Profile] 🎬 Hydration check: React tree mounted')
+    setIsHydrated(true)
+  }, [])
+
+  // 🔧 FIX 2: AUTOMATIC REDIRECT - If user has completed profile and redirectTo exists
+  useEffect(() => {
+    // Only run once after hydration and when session is ready
+    if (hasAutoRedirectedRef.current || !isHydrated || loading || profileLoading || !session || !user) return
+    
+    const redirectTo = searchParams.get('redirectTo')
+    
+    // Check profile completion from UserContext (more reliable than user_metadata)
+    const isProfileComplete = userProfile?.profile_completed === true
+    
+    console.log('[Profile] 📊 Auto-redirect check:', {
+      hasRedirectedRef: hasAutoRedirectedRef.current,
+      isHydrated,
+      loading,
+      profileLoading,
+      hasSession: !!session,
+      hasUser: !!user,
+      redirectTo,
+      isProfileComplete,
+      userProfile: userProfile ? 'exists' : 'null'
+    })
+    
+    if (redirectTo && isProfileComplete) {
+      hasAutoRedirectedRef.current = true
+      console.log('[Profile] 🚀 Auto-redirecting completed profile to:', redirectTo)
+      
+      // Clean URL and navigate atomically
+      ;(async () => {
+        try {
+          // Clean URL first
+          const cleanUrl = window.location.pathname
+          window.history.replaceState({}, '', cleanUrl)
+          
+          // Small delay to let React stabilize
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
+          // Navigate to target
+          console.log('[Profile] ✈️ Executing redirect to:', redirectTo)
+          await router.replace(redirectTo)
+        } catch (err) {
+          console.error('[Profile] ❌ Auto-redirect failed:', err)
+          // Fallback: direct navigation
+          window.location.href = redirectTo
+        }
+      })()
+    }
+  }, [isHydrated, loading, profileLoading, session, user, userProfile, searchParams, router])
+
+  // 🔧 FIX 3: Clean up redirectTo query param for incomplete profiles - ONLY ONCE
+  useEffect(() => {
+    // Only clean URL if profile is incomplete (user needs to complete it first)
+    if (cleanedRef.current || !isHydrated || loading || profileLoading || !session || !user) return
+    
+    const redirectTo = searchParams.get('redirectTo')
+    const isProfileComplete = userProfile?.profile_completed === true
+    
+    // Only clean if profile is NOT completed (so user stays on profile page)
+    if (redirectTo && !isProfileComplete) {
+      cleanedRef.current = true
+      console.log('[Profile] 🧹 Incomplete profile - cleaning URL but staying on page, redirectTo:', redirectTo)
+      // Store redirectTo for after profile completion
+      sessionStorage.setItem('profile-redirectTo', redirectTo)
+      // Replace URL without query
+      router.replace('/profile')
+    }
+  }, [isHydrated, loading, profileLoading, session, user, userProfile, searchParams, router])
+
+  // 🔧 FIX 3: Authentication check with proper state management
+  useEffect(() => {
+    if (!loading && isHydrated) {
       if (!session) {
-        console.log('No session found, redirecting to auth')
+        console.log('[Profile] ❌ No session found, redirecting to auth')
         router.push('/auth')
       } else {
-        console.log('Session found, showing profile page')
+        console.log('[Profile] ✅ Session found, showing profile page')
+        console.log('[Profile] User:', user?.email)
+        console.log('[Profile] Query params:', window.location.search)
         setIsChecking(false)
       }
     }
-  }, [session, loading, router])
+  }, [session, loading, router, user, isHydrated])
 
   // Show loading while checking authentication
   if (loading || isChecking) {
@@ -100,11 +185,36 @@ export default function ProfilePage() {
                   </div>
 
                   <Button 
-                    onClick={() => router.push('/dashboard')}
+                    onClick={async () => {
+                      if (isNavigating) return
+                      
+                      console.log('[Profile] 🎯 Dashboard button clicked')
+                      setIsNavigating(true)
+                      
+                      try {
+                        // Await navigation to handle any promise rejections
+                        await router.push('/dashboard')
+                      } catch (navErr) {
+                        console.error('[Profile] ❌ Navigation to dashboard failed:', navErr)
+                        // Fallback to direct navigation
+                        window.location.href = '/dashboard'
+                      } finally {
+                        setIsNavigating(false)
+                      }
+                    }}
                     className="w-full mt-6 bg-primary hover:bg-primary-hover"
+                    disabled={!isHydrated || isNavigating}
                   >
-                    Go to Dashboard
+                    {isNavigating ? 'Navigating...' : 'Go to Dashboard'}
                   </Button>
+                  
+                  {/* Debug: Show hydration status */}
+                  {!isHydrated && (
+                    <p className="text-xs text-foreground-muted mt-2">Initializing...</p>
+                  )}
+                  {isNavigating && (
+                    <p className="text-xs text-foreground-muted mt-2">Loading dashboard...</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
+import { initializeAuthHandler } from '@/lib/supabaseAuthHandler'
 
 const AuthContext = createContext({})
 
@@ -25,6 +26,11 @@ export function AuthProvider({ children }) {
 
     console.log('🔐 [AUTH_PROVIDER] Initializing AuthProvider')
     
+    // ✅ CRITICAL: Initialize global auth handler for OTP/magic link redirects
+    if (typeof window !== 'undefined') {
+      initializeAuthHandler()
+    }
+    
     // Set ready immediately for auth operations
     setIsReady(true)
     setAuthReady(true)
@@ -47,72 +53,71 @@ export function AuthProvider({ children }) {
     // Fetch or create user profile
     const fetchOrCreateProfile = async (userId, userEmail) => {
       try {
-        console.log('Fetching profile for user:', userId)
+        console.log('[AUTH_PROVIDER] 🔍 Fetching profile for user:', userId)
         
-        // Try to fetch existing profile
-        const { data, error, status } = await supabase
+        // 🔧 FIX: Use order + limit to avoid 406 errors with duplicates
+        const { data: rows, error: fetchError } = await supabase
           .from('users')
           .select('*')
           .eq('auth_id', userId)
-          .maybeSingle()
+          .order('updated_at', { ascending: false })
+          .limit(1)
 
-        if (error && status === 406) {
-          console.warn('Profile not found (406), creating via server endpoint...')
-          
-          // Create profile via server endpoint
-          const response = await fetch('/api/profile/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              auth_id: userId, 
-              email: userEmail 
-            })
-          })
-
-          if (!response.ok) {
-            const text = await response.text()
-            console.error('Server profile creation failed:', text)
-            return null
-          }
-
-          const result = await response.json()
-          console.log('✅ Profile created via server endpoint')
-          return result.data
+        if (fetchError) {
+          console.error('[AUTH_PROVIDER] ❌ Profile fetch error:', fetchError)
+          // Continue to try creating profile
         }
 
-        if (error) {
-          console.error('Profile fetch error:', error)
-          return null
-        }
-
-        if (data) {
-          console.log('✅ Profile found in database')
-          return data
+        const existingProfile = rows && rows.length > 0 ? rows[0] : null
+        
+        if (existingProfile) {
+          console.log('[AUTH_PROVIDER] ✅ Profile already exists, skipping creation')
+          return existingProfile
         }
 
         // No profile found, create one
-        console.log('No profile found, creating...')
+        console.log('[AUTH_PROVIDER] 📝 Creating basic profile stub...')
         const response = await fetch('/api/profile/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             auth_id: userId, 
-            email: userEmail 
+            email: userEmail,
+            profile_completed: false  // 🔧 FIX: Explicitly set to false for stub creation
           })
         })
 
-        if (response.ok) {
-          const result = await response.json()
-          console.log('✅ Profile created successfully')
-          return result.data
+        const responseData = await response.json()
+        console.log('[AUTH_PROVIDER] Profile creation response:', { status: response.status, data: responseData })
+
+        if (response.ok && responseData.data) {
+          console.log('[AUTH_PROVIDER] ✅ Profile stub created successfully')
+          return responseData.data
+        } else if (response.status === 409 || response.status === 200) {
+          // 🔧 FIX: Handle 409 gracefully - profile already exists, fetch it again
+          console.log('[AUTH_PROVIDER] ℹ️ Profile already exists (409/200), fetching it...')
+          
+          // Fetch the existing profile using safe method
+          const { data: refetchRows } = await supabase
+            .from('users')
+            .select('*')
+            .eq('auth_id', userId)
+            .order('updated_at', { ascending: false })
+            .limit(1)
+          
+          const refetchedProfile = refetchRows && refetchRows.length > 0 ? refetchRows[0] : null
+          if (refetchedProfile) {
+            console.log('[AUTH_PROVIDER] ✅ Fetched existing profile after 409/200')
+            return refetchedProfile
+          }
+          return null
         } else {
-          const errorText = await response.text()
-          console.error('Profile creation failed:', errorText)
+          console.error('[AUTH_PROVIDER] ❌ Profile creation failed:', responseData)
           return null
         }
 
       } catch (err) {
-        console.error('Profile fetch/create error:', err)
+        console.error('[AUTH_PROVIDER] ❌ Profile fetch/create error:', err)
         return null
       }
     }
@@ -154,56 +159,101 @@ export function AuthProvider({ children }) {
     // Initialize session
     getInitialSession()
 
-    // Listen for auth changes with profile handling
+    // Listen for auth changes with profile handling - WITH DEBOUNCING
+    let sessionTimeout
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         if (!mounted) return
         
-        console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthProvider onAuthStateChange:", {
+        console.log("[AUTH_PROVIDER][EVENT] 🔄", {
           event,
           hasSession: !!session,
           userId: session?.user?.id,
-          userEmail: session?.user?.email
+          userEmail: session?.user?.email,
+          timestamp: new Date().toISOString()
         })
         
         // CRITICAL FIX: Don't clear session during transitions
         if (!session && event !== 'SIGNED_OUT') {
-          console.log("[DEBUG] Preventing session clear during transition, event:", event)
+          console.log("[AUTH_PROVIDER] ⏸️ Preventing session clear during transition, event:", event)
           return
         }
         
-        setLoading(true)
-        setSession(session)
-        setUser(session?.user ?? null)
-        
-        // Handle profile creation for new sessions
-        if (event === 'SIGNED_IN' && session?.user?.id) {
-          console.log('[AUTH_PROVIDER] SIGNED_IN event - triggering profile fetch/create')
-          await fetchOrCreateProfile(session.user.id, session.user.email)
-        }
-        
-        setLoading(false)
-        setIsReady(true)
-        setAuthReady(true)
-        
-        console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthReady:", true, "Session:", !!session, "User:", !!session?.user)
+        // DEBOUNCE: Clear any existing timeout and set a new one
+        clearTimeout(sessionTimeout)
+        sessionTimeout = setTimeout(async () => {
+          if (!mounted) return
+          
+          console.log("[DEBUG] Processing debounced auth state change:", event)
+          
+          setLoading(true)
+          setSession(session)
+          setUser(session?.user ?? null)
+          
+          // 🔐 CRITICAL: Sync session to server immediately after SIGNED_IN
+          if (event === 'SIGNED_IN' && session?.access_token) {
+            console.log('[AUTH_PROVIDER] 🔐 SIGNED_IN - syncing session to server...')
+            
+            // 🔧 FIX: Add small delay to ensure Supabase client fully sets localStorage first
+            await new Promise(resolve => setTimeout(resolve, 200))
+            
+            try {
+              const syncResponse = await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  access_token: session.access_token,
+                  refresh_token: session.refresh_token
+                })
+              })
+              
+              if (syncResponse.ok) {
+                const syncData = await syncResponse.json()
+                console.log('[AUTH_PROVIDER] ✅ Session synced to server successfully:', syncData)
+                
+                // 🔧 CRITICAL: Wait a bit more to ensure cookies are set on server
+                await new Promise(resolve => setTimeout(resolve, 300))
+                console.log('[AUTH_PROVIDER] ✅ Server cookies should be fully set now')
+              } else {
+                const errorText = await syncResponse.text()
+                console.error('[AUTH_PROVIDER] ❌ Failed to sync session to server:', errorText)
+              }
+            } catch (syncError) {
+              console.error('[AUTH_PROVIDER] ❌ Session sync error:', syncError)
+            }
+            
+            // Handle profile creation for new sessions
+            console.log('[AUTH_PROVIDER] SIGNED_IN event - triggering profile fetch/create')
+            // 🔧 FIX: Only create profile if we don't already have one in the current context
+            await fetchOrCreateProfile(session.user.id, session.user.email)
+          }
+          
+          setLoading(false)
+          setIsReady(true)
+          setAuthReady(true)
+          
+          console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthReady:", true, "Session:", !!session, "User:", !!session?.user)
+        }, 300) // 300ms debounce to let Supabase stabilize
       }
     )
 
     return () => {
       mounted = false
+      clearTimeout(sessionTimeout)
       subscription?.unsubscribe()
     }
   }, [])
 
-  // Sign up with OTP
+    // Sign up with OTP
   const signUpWithOTP = async (email, userData = {}) => {
     try {
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
           data: userData,
-          shouldCreateUser: true
+          shouldCreateUser: true,
+          // ✅ CRITICAL: Set redirectTo for OTP email link
+          emailRedirectTo: `${window.location.origin}/auth?redirectTo=/dashboard`
         }
       })
 
@@ -221,7 +271,9 @@ export function AuthProvider({ children }) {
       const { data, error } = await supabase.auth.signInWithOtp({
         email,
         options: {
-          shouldCreateUser: false
+          shouldCreateUser: false,
+          // ✅ CRITICAL: Set redirectTo for OTP email link
+          emailRedirectTo: `${window.location.origin}/auth?redirectTo=/dashboard`
         }
       })
 
@@ -276,14 +328,17 @@ export function AuthProvider({ children }) {
       })
 
       // Check if profile exists
-      const { data: profile, error: profileErr } = await supabase
+      const { data: profileRows, error: profileErr } = await supabase
         .from('users')
         .select('*')
         .eq('auth_id', currentUser.id)
-        .single()
+        .order('updated_at', { ascending: false })
+        .limit(1)
+      
+      const profile = profileRows && profileRows.length > 0 ? profileRows[0] : null
 
       // If profile doesn't exist, create it via server endpoint
-      if (profileErr && (profileErr.code === 'PGRST116' || profileErr.status === 404)) {
+      if (!profile || profileErr) {
         console.log('Profile not found, creating via server endpoint...')
         
         try {

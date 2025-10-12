@@ -27,31 +27,25 @@ const calculateProfileCompletion = (profile) => {
 // Safely fetch a single users row by auth_id even if duplicates exist
 const getDbProfileByAuthId = async (authId) => {
   try {
-    // First try the fast path
-    const { data, error, status } = await supabase
+    // 🔧 FIX: Always use order + limit approach to avoid 406 errors
+    // Don't use .single() as it throws 406 if multiple rows exist
+    const { data: rows, error } = await supabase
       .from('users')
       .select('*')
       .eq('auth_id', authId)
-      .single()
-    
-    if (!error) return { data, error: null }
+      .order('updated_at', { ascending: false, nullsLast: true })
+      .limit(1)
 
-    // If multiple rows (406) or ambiguous result, fall back to latest by updated_at
-    const isMultiple = status === 406 || (error?.message || '').toLowerCase().includes('multiple') || (error?.message || '').toLowerCase().includes('results contain')
-    if (isMultiple) {
-      const { data: rows, error: listError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', authId)
-        .order('updated_at', { ascending: false, nullsLast: true })
-        .limit(1)
-
-      if (listError) return { data: null, error: listError }
-      return { data: rows?.[0] || null, error: null }
+    if (error) {
+      console.error('[USER_CONTEXT] Error fetching profile:', error)
+      return { data: null, error }
     }
-
-    return { data: null, error }
+    
+    const profile = rows && rows.length > 0 ? rows[0] : null
+    console.log('[USER_CONTEXT] Profile fetch result:', { found: !!profile, count: rows?.length })
+    return { data: profile, error: null }
   } catch (e) {
+    console.error('[USER_CONTEXT] Exception fetching profile:', e)
     return { data: null, error: e }
   }
 }
@@ -69,6 +63,9 @@ export function UserProvider({ children }) {
   const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  
+  // 🔧 FIX: Add userLoading state for AuthFlow dependency
+  const [userLoading, setUserLoading] = useState(true)
 
   // Fetch user profile from Supabase
   useEffect(() => {
@@ -81,20 +78,24 @@ export function UserProvider({ children }) {
         userEmail: user?.email
       })
       
-      // CRITICAL FIX: Wait for session stabilization, don't clear profile yet
+      // 🔧 CRITICAL FIX: Handle session stabilization properly
       if (!session?.user) {
-        console.log("[USER_CONTEXT] Waiting for session stabilization...")
+        console.log("[USER_CONTEXT] No session/user, setting loading states...")
+        setUserLoading(false)
+        setLoading(false)
         return
       }
       
-      // CRITICAL FIX: Prevent repeated re-fetching for same user
+      // 🔧 CRITICAL FIX: Prevent repeated re-fetching for same user
       if (userProfile?.id === session.user.id) {
         console.log("[USER_CONTEXT] Profile already loaded for user:", session.user.id)
+        setUserLoading(false)
         return
       }
 
       try {
         setLoading(true)
+        setUserLoading(true)
         console.log('🔐 [USER_CONTEXT] Fetching profile for user:', user.id)
 
         // Get user metadata from auth
@@ -131,6 +132,7 @@ export function UserProvider({ children }) {
           bio: authMetadata.bio || dbProfile?.bio || '',
           skills: authMetadata.skills || dbProfile?.skills || [],
           profileCompleted: authMetadata.profileCompleted || dbProfile?.profile_completed || false,
+          is_complete: authMetadata.profileCompleted || dbProfile?.profile_completed || false,  // ✅ Add alias for AuthFlow
           profileCompletion: authMetadata.profileCompletion || (
             // Calculate profile completion percentage
             calculateProfileCompletion({
@@ -161,7 +163,8 @@ export function UserProvider({ children }) {
         setError(err.message)
       } finally {
         setLoading(false)
-        console.log('🔐 [USER_CONTEXT] fetchUserProfile completed, loading set to false')
+        setUserLoading(false)  // 🔧 FIX: Always set userLoading to false when done
+        console.log('🔐 [USER_CONTEXT] fetchUserProfile completed, loading states set to false')
       }
     }
 
@@ -218,6 +221,7 @@ export function UserProvider({ children }) {
         bio: authMetadata.bio || dbProfile?.bio || '',
         skills: authMetadata.skills || dbProfile?.skills || [],
         profileCompleted: authMetadata.profileCompleted || dbProfile?.profile_completed || false,
+        is_complete: authMetadata.profileCompleted || dbProfile?.profile_completed || false,  // ✅ Add alias for AuthFlow
         profileCompletion: authMetadata.profileCompletion || (
           calculateProfileCompletion({
             firstName: authMetadata.first_name || dbProfile?.first_name || '',
@@ -368,6 +372,7 @@ export function UserProvider({ children }) {
   const value = {
     userProfile,
     loading,
+    userLoading,  // 🔧 FIX: Export userLoading for AuthFlow dependency
     error,
     updateProfile,
     refreshProfile,
