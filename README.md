@@ -380,11 +380,7 @@ We welcome contributions! Please follow these steps:
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 👥 Team
 
-- **Lead Developer**: [Vaibhav J P](https://github.com/geeky-vaiiib)
-- **Project Type**: Full-Stack Alumni Networking Platform
-- **Institution**: SIT (Siddaganga Institute of Technology)
 
 ## 🙏 Acknowledgments
 
