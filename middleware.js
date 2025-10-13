@@ -19,38 +19,34 @@ export async function middleware(request) {
   const allCookies = request.cookies.getAll()
   console.log('🛡️ [MIDDLEWARE] cookies:', allCookies.map(c => c.name).join(', '))
   
-  // Check for our custom session cookies
-  const customAccessToken = request.cookies.get('sb-access-token')
-  const customRefreshToken = request.cookies.get('sb-refresh-token')
-  console.log('🛡️ [MIDDLEWARE] custom cookies:', {
-    hasCustomAccessToken: !!customAccessToken,
-    hasCustomRefreshToken: !!customRefreshToken
-  })
-  
-  // 🔧 FIX: If we have custom cookies but no Supabase session, set session from custom cookies
-  if (customAccessToken?.value && !request.cookies.get('sb-flcgwqlabywhoulqalaz-auth-token')) {
-    console.log('🛡️ [MIDDLEWARE] 🔧 Custom cookies found, attempting to restore session...')
-    try {
-      const { error } = await supabase.auth.setSession({
-        access_token: customAccessToken.value,
-        refresh_token: customRefreshToken?.value || customAccessToken.value
-      })
-      if (error) {
-        console.error('🛡️ [MIDDLEWARE] ❌ Failed to restore session from custom cookies:', error)
-      } else {
-        console.log('🛡️ [MIDDLEWARE] ✅ Session restored from custom cookies')
-      }
-    } catch (err) {
-      console.error('🛡️ [MIDDLEWARE] ❌ Exception restoring session:', err)
-    }
-  }
-  
   // Refresh session if expired - required for Server Components
   const {
     data: { session },
   } = await supabase.auth.getSession()
 
   console.log('🛡️ [MIDDLEWARE] server session present?', !!session, 'session.user?.id=', session?.user?.id ?? null)
+  
+  // 🔧 Enhanced session debugging
+  if (session) {
+    console.log('🛡️ [MIDDLEWARE] ✅ Session details:', {
+      userId: session.user.id,
+      email: session.user.email,
+      expiresAt: new Date(session.expires_at * 1000).toISOString()
+    })
+  } else {
+    // Check if we have Supabase cookies but session failed to load
+    const hasSupabaseCookies = allCookies.some(c => 
+      c.name.includes('sb-') && c.name.includes('auth-token')
+    )
+    if (hasSupabaseCookies) {
+      console.log('🛡️ [MIDDLEWARE] ⚠️ WARNING: Supabase cookies present but getSession() returned null')
+      console.log('🛡️ [MIDDLEWARE] Cookie names:', allCookies
+        .filter(c => c.name.includes('sb-') || c.name.includes('auth'))
+        .map(c => c.name)
+        .join(', ')
+      )
+    }
+  }
   console.log('🛡️ [MIDDLEWARE] Request details:', {
     pathname: url.pathname,
     hasSession: !!session,
