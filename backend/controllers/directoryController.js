@@ -1,7 +1,6 @@
 const { query, validationResult } = require('express-validator');
-const { supabase, supabaseAdmin, supabaseHelpers } = require('../config/supabase');
+const { supabase } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
-const { getFileUrl } = require('../middlewares/uploadMiddleware');
 
 /**
  * Directory Controller
@@ -41,37 +40,37 @@ const getAlumniDirectory = catchAsync(async (req, res, next) => {
 
   try {
     // Build Supabase query with filters
-    let query = supabaseAdmin
+    let dbQuery = supabase
       .from('users')
-      .select('*')
+      .select('*', { count: 'exact' })
       .eq('is_deleted', false)
       .eq('is_email_verified', true);
 
     // Apply filters
     if (branch) {
-      query = query.eq('branch', branch);
+      dbQuery = dbQuery.eq('branch', branch);
     }
 
     if (year) {
-      query = query.eq('passing_year', parseInt(year));
+      dbQuery = dbQuery.eq('passing_year', parseInt(year));
     }
 
     if (location) {
-      query = query.ilike('location', `%${location}%`);
+      dbQuery = dbQuery.ilike('location', `%${location}%`);
     }
 
     if (company) {
-      query = query.ilike('company', `%${company}%`);
+      dbQuery = dbQuery.ilike('company', `%${company}%`);
     }
 
     if (skills) {
       // Search in skills JSONB array
       const skillsArray = skills.split(',').map(skill => skill.trim());
-      query = query.overlaps('skills', skillsArray);
+      dbQuery = dbQuery.overlaps('skills', skillsArray);
     }
 
     if (search) {
-      query = query.or(`
+      dbQuery = dbQuery.or(`
         first_name.ilike.%${search}%,
         last_name.ilike.%${search}%,
         company.ilike.%${search}%,
@@ -85,68 +84,31 @@ const getAlumniDirectory = catchAsync(async (req, res, next) => {
     const sortField = validSortFields.includes(sortBy) ? sortBy : 'first_name';
     const sortDirection = sortOrder.toLowerCase() === 'asc';
 
-    query = query.order(sortField, { ascending: sortDirection });
+    dbQuery = dbQuery.order(sortField, { ascending: sortDirection });
 
     // Apply pagination
     const pageNum = Math.max(1, parseInt(page));
     const limitNum = Math.min(Math.max(1, parseInt(limit)), 100);
     const offset = (pageNum - 1) * limitNum;
 
-    query = query.range(offset, offset + limitNum - 1);
+    dbQuery = dbQuery.range(offset, offset + limitNum - 1);
 
     // Execute query
-    const { data: alumni, error } = await query;
+    const { data: alumni, error, count: totalCount } = await dbQuery;
 
     if (error) {
       console.error('Supabase alumni query error:', error);
       return next(new AppError('Failed to fetch alumni directory', 500));
     }
 
-    // Get total count for pagination
-    let countQuery = supabaseAdmin
-      .from('users')
-      .select('*', { count: 'exact', head: true })
-      .eq('is_deleted', false)
-      .eq('is_email_verified', true);
-
-    // Apply same filters for count
-    if (branch) countQuery = countQuery.eq('branch', branch);
-    if (year) countQuery = countQuery.eq('passing_year', parseInt(year));
-    if (location) countQuery = countQuery.ilike('location', `%${location}%`);
-    if (company) countQuery = countQuery.ilike('company', `%${company}%`);
-    if (skills) {
-      const skillsArray = skills.split(',').map(skill => skill.trim());
-      countQuery = countQuery.overlaps('skills', skillsArray);
-    }
-    if (search) {
-      countQuery = countQuery.or(`
-        first_name.ilike.%${search}%,
-        last_name.ilike.%${search}%,
-        company.ilike.%${search}%,
-        current_position.ilike.%${search}%,
-        bio.ilike.%${search}%
-      `);
-    }
-
-    const { count: totalCount, error: countError } = await countQuery;
-
-    if (countError) {
-      console.error('Count query error:', countError);
-    }
-
     // Remove sensitive information and format response
     const sanitizedAlumni = alumni.map(user => {
       const { password_hash, auth_id, ...alumniData } = user;
 
-      // Add file URLs if available
-      if (alumniData.profile_picture) {
-        alumniData.profilePictureUrl = getFileUrl(req, alumniData.profile_picture);
-      }
-
       // Format additional fields
       return {
         ...alumniData,
-        fullName: `${alumniData.first_name} ${alumniData.last_name}`,
+        fullName: `${alumniData.first_name || ''} ${alumniData.last_name || ''}`.trim(),
         graduationYear: alumniData.passing_year,
         profileComplete: !!(alumniData.bio && alumniData.current_position && alumniData.company)
       };
@@ -198,7 +160,7 @@ const getAlumniById = catchAsync(async (req, res, next) => {
 
   try {
     // Get alumni details
-    const { data: alumni, error } = await supabaseAdmin
+    const { data: alumni, error } = await supabase
       .from('users')
       .select('*')
       .eq('id', id)
@@ -217,15 +179,10 @@ const getAlumniById = catchAsync(async (req, res, next) => {
     // Remove sensitive information
     const { password_hash, auth_id, ...alumniData } = alumni;
 
-    // Add file URLs if available
-    if (alumniData.profile_picture) {
-      alumniData.profilePictureUrl = getFileUrl(req, alumniData.profile_picture);
-    }
-
     // Format response
     const formattedAlumni = {
       ...alumniData,
-      fullName: `${alumniData.first_name} ${alumniData.last_name}`,
+      fullName: `${alumniData.first_name || ''} ${alumniData.last_name || ''}`.trim(),
       graduationYear: alumniData.passing_year,
       profileComplete: !!(alumniData.bio && alumniData.current_position && alumniData.company),
       socialLinks: alumniData.social_links || {},
@@ -302,82 +259,51 @@ const getTotalAlumniCount_OLD = async (filters) => {
  * Get alumni statistics
  */
 const getAlumniStats = catchAsync(async (req, res, next) => {
-  // Get statistics using database queries for better performance
-  const totalAlumniResult = await dbHelpers.query(
-    'SELECT COUNT(*) as total FROM users WHERE is_deleted = FALSE AND is_email_verified = TRUE'
-  );
+  try {
+    // Get total alumni count
+    const { count: totalAlumni, error: totalError } = await supabase
+      .from('users')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_deleted', false)
+      .eq('is_email_verified', true);
 
-  const byBranchResult = await dbHelpers.query(`
-    SELECT branch, COUNT(*) as count
-    FROM users
-    WHERE is_deleted = FALSE AND is_email_verified = TRUE AND branch IS NOT NULL
-    GROUP BY branch
-    ORDER BY count DESC
-  `);
-
-  const byYearResult = await dbHelpers.query(`
-    SELECT graduation_year, COUNT(*) as count
-    FROM users
-    WHERE is_deleted = FALSE AND is_email_verified = TRUE AND graduation_year IS NOT NULL
-    GROUP BY graduation_year
-    ORDER BY graduation_year DESC
-  `);
-
-  const byLocationResult = await dbHelpers.query(`
-    SELECT location, COUNT(*) as count
-    FROM users
-    WHERE is_deleted = FALSE AND is_email_verified = TRUE AND location IS NOT NULL
-    GROUP BY location
-    ORDER BY count DESC
-    LIMIT 20
-  `);
-
-  const byCompanyResult = await dbHelpers.query(`
-    SELECT company, COUNT(*) as count
-    FROM users
-    WHERE is_deleted = FALSE AND is_email_verified = TRUE AND company IS NOT NULL
-    GROUP BY company
-    ORDER BY count DESC
-    LIMIT 20
-  `);
-
-  const recentJoinersResult = await dbHelpers.query(`
-    SELECT first_name, last_name, company, current_position, created_at
-    FROM users
-    WHERE is_deleted = FALSE AND is_email_verified = TRUE
-    AND created_at > NOW() - INTERVAL '30 days'
-    ORDER BY created_at DESC
-    LIMIT 10
-  `);
-
-  // Calculate statistics
-  const stats = {
-    totalAlumni: parseInt(totalAlumniResult.rows[0].total),
-    byBranch: byBranchResult.rows.reduce((acc, row) => {
-      acc[row.branch] = parseInt(row.count);
-      return acc;
-    }, {}),
-    byYear: byYearResult.rows.reduce((acc, row) => {
-      acc[row.graduation_year] = parseInt(row.count);
-      return acc;
-    }, {}),
-    byLocation: byLocationResult.rows.reduce((acc, row) => {
-      acc[row.location] = parseInt(row.count);
-      return acc;
-    }, {}),
-    byCompany: byCompanyResult.rows.reduce((acc, row) => {
-      acc[row.company] = parseInt(row.count);
-      return acc;
-    }, {}),
-    recentJoiners: recentJoinersResult.rows
-  };
-
-  res.status(200).json({
-    success: true,
-    data: {
-      stats
+    if (totalError) {
+      console.error('Total alumni count error:', totalError);
     }
-  });
+
+    // Get stats by branch
+    const { data: branchData, error: branchError } = await supabase
+      .from('users')
+      .select('branch')
+      .eq('is_deleted', false)
+      .eq('is_email_verified', true)
+      .not('branch', 'is', null);
+
+    const byBranch = branchData?.reduce((acc, row) => {
+      acc[row.branch] = (acc[row.branch] || 0) + 1;
+      return acc;
+    }, {}) || {};
+
+    // Calculate statistics
+    const stats = {
+      totalAlumni: totalAlumni || 0,
+      byBranch,
+      byYear: {},
+      byLocation: {},
+      byCompany: {},
+      recentJoiners: []
+    };
+
+    res.status(200).json({
+      success: true,
+      data: {
+        stats
+      }
+    });
+  } catch (error) {
+    console.error('Alumni stats fetch error:', error);
+    return next(new AppError('Failed to fetch alumni statistics', 500));
+  }
 });
 
 /**
@@ -386,35 +312,38 @@ const getAlumniStats = catchAsync(async (req, res, next) => {
 const getFeaturedAlumni = catchAsync(async (req, res, next) => {
   const { limit = 6 } = req.query;
 
-  // Get featured alumni using database query
-  const featuredAlumniResult = await dbHelpers.query(`
-    SELECT * FROM users
-    WHERE is_deleted = FALSE AND is_email_verified = TRUE
-    AND bio IS NOT NULL AND company IS NOT NULL
-    AND array_length(skills, 1) > 0
-    ORDER BY
-      (CASE WHEN profile_picture IS NOT NULL THEN 1 ELSE 0 END) +
-      (CASE WHEN resume IS NOT NULL THEN 1 ELSE 0 END) +
-      array_length(skills, 1) +
-      array_length(experience, 1) DESC,
-      created_at DESC
-    LIMIT $1
-  `, [parseInt(limit)]);
+  try {
+    // Get featured alumni from Supabase
+    const { data: featuredAlumniData, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('is_deleted', false)
+      .eq('is_email_verified', true)
+      .not('bio', 'is', null)
+      .not('company', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(parseInt(limit));
 
-  const featuredAlumni = featuredAlumniResult.rows.map(user => {
-    const { password_hash, ...userData } = user;
-    if (userData.profile_picture) {
-      userData.profilePictureUrl = getFileUrl(req, userData.profile_picture);
+    if (error) {
+      console.error('Featured alumni fetch error:', error);
+      return next(new AppError('Failed to fetch featured alumni', 500));
     }
-    return userData;
-  });
 
-  res.status(200).json({
-    success: true,
-    data: {
-      featuredAlumni
-    }
-  });
+    const featuredAlumni = featuredAlumniData.map(user => {
+      const { password_hash, auth_id, ...userData } = user;
+      return userData;
+    });
+
+    res.status(200).json({
+      success: true,
+      data: {
+        featuredAlumni
+      }
+    });
+  } catch (error) {
+    console.error('Featured alumni fetch error:', error);
+    return next(new AppError('Failed to fetch featured alumni', 500));
+  }
 });
 
 // Validation rules

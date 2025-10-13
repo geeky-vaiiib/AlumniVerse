@@ -2,9 +2,10 @@
 
 import { createContext, useContext, useState, useEffect } from 'react'
 import { useAuth } from '../components/providers/AuthProvider'
-import { supabase } from '../lib/supabaseClient'
+import { getSupabaseClient } from '../lib/supabase-singleton'
 import { validateGitHubUrl, validateLinkedInUrl, validateLeetCodeUrl } from '../lib/utils/urlValidation'
 
+const supabase = getSupabaseClient()
 const UserContext = createContext()
 
 // Calculate profile completion percentage
@@ -83,6 +84,7 @@ export function UserProvider({ children }) {
         console.log("[USER_CONTEXT] No session/user, setting loading states...")
         setUserLoading(false)
         setLoading(false)
+        setUserProfile(null) // 🔧 Clear profile when no session
         return
       }
       
@@ -90,6 +92,7 @@ export function UserProvider({ children }) {
       if (userProfile?.id === session.user.id) {
         console.log("[USER_CONTEXT] Profile already loaded for user:", session.user.id)
         setUserLoading(false)
+        setLoading(false) // 🔧 Ensure loading is false
         return
       }
 
@@ -292,37 +295,53 @@ export function UserProvider({ children }) {
       }
 
       // Update database profile with proper null handling
-      const { error: dbError } = await supabase
-        .from('users')
-        .upsert({
-          auth_id: user.id,
-          email: user.email,
-          first_name: updates.firstName || userProfile?.firstName || null,
-          last_name: updates.lastName || userProfile?.lastName || null,
-          usn: updates.usn || userProfile?.usn || null,
-          branch: updates.branch || userProfile?.branch || null,
-          admission_year: updates.joiningYear || userProfile?.joiningYear || null,
-          passing_year: updates.passingYear || userProfile?.passingYear || null,
-          company: updates.currentCompany || userProfile?.currentCompany || null,
-          current_position: updates.designation || userProfile?.designation || null,
-          location: updates.location || userProfile?.location || null,
-          // Handle URL fields - validate and send null instead of empty strings to satisfy CHECK constraints
-          linkedin_url: validateLinkedInUrl(updates.linkedinUrl) || validateLinkedInUrl(userProfile?.linkedinUrl),
-          github_url: validateGitHubUrl(updates.githubUrl) || validateGitHubUrl(userProfile?.githubUrl),
-          leetcode_url: validateLeetCodeUrl(updates.leetcodeUrl) || validateLeetCodeUrl(userProfile?.leetcodeUrl),
-          resume_url: (updates.resumeUrl && updates.resumeUrl.trim()) ? updates.resumeUrl.trim() : 
-                     (userProfile?.resumeUrl && userProfile.resumeUrl.trim()) ? userProfile.resumeUrl.trim() : null,
-          bio: updates.bio || userProfile?.bio || null,
-          skills: updates.skills || userProfile?.skills || null,
-          profile_completed: Boolean(updates.profileCompleted || userProfile?.profileCompleted),
-          updated_at: new Date().toISOString()
-        }, {
-          onConflict: 'auth_id'
-        })
+      // First, try to update existing record
+      const profileData = {
+        auth_id: user.id,
+        email: user.email,
+        first_name: updates.firstName || userProfile?.firstName || null,
+        last_name: updates.lastName || userProfile?.lastName || null,
+        usn: updates.usn || userProfile?.usn || null,
+        branch: updates.branch || userProfile?.branch || null,
+        admission_year: updates.joiningYear || userProfile?.joiningYear || null,
+        passing_year: updates.passingYear || userProfile?.passingYear || null,
+        company: updates.currentCompany || userProfile?.currentCompany || null,
+        current_position: updates.designation || userProfile?.designation || null,
+        location: updates.location || userProfile?.location || null,
+        // Handle URL fields - validate and send null instead of empty strings to satisfy CHECK constraints
+        linkedin_url: validateLinkedInUrl(updates.linkedinUrl) || validateLinkedInUrl(userProfile?.linkedinUrl),
+        github_url: validateGitHubUrl(updates.githubUrl) || validateGitHubUrl(userProfile?.githubUrl),
+        leetcode_url: validateLeetCodeUrl(updates.leetcodeUrl) || validateLeetCodeUrl(userProfile?.leetcodeUrl),
+        resume_url: (updates.resumeUrl && updates.resumeUrl.trim()) ? updates.resumeUrl.trim() : 
+                   (userProfile?.resumeUrl && userProfile.resumeUrl.trim()) ? userProfile.resumeUrl.trim() : null,
+        bio: updates.bio || userProfile?.bio || null,
+        skills: updates.skills || userProfile?.skills || null,
+        profile_completed: Boolean(updates.profileCompleted || userProfile?.profileCompleted),
+        updated_at: new Date().toISOString()
+      }
 
-      if (dbError) {
-        console.error('UserContext: Database update error:', dbError)
-        throw new Error(dbError.message || 'Failed to update user profile in database')
+      // Try update first, if fails then insert
+      const { data: updatedData, error: updateError } = await supabase
+        .from('users')
+        .update(profileData)
+        .eq('auth_id', user.id)
+        .select()
+      
+      if (updateError) {
+        // If update fails because no record exists, try insert
+        if (updateError.code === 'PGRST116') {
+          const { error: insertError } = await supabase
+            .from('users')
+            .insert(profileData)
+          
+          if (insertError) {
+            console.error('UserContext: Database insert error:', insertError)
+            throw new Error(insertError.message || 'Failed to create user profile in database')
+          }
+        } else {
+          console.error('UserContext: Database update error:', updateError)
+          throw new Error(updateError.message || 'Failed to update user profile in database')
+        }
       }
 
       // Update local state only if there were actual changes

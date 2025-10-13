@@ -21,9 +21,9 @@ const profileRoutes = require('./routes/profileRoutes'); // Enhanced profile rou
 const postsRoutes = require('./routes/postsRoutes'); // Social posts routes
 const jobsRoutes = require('./routes/jobsRoutes'); // Jobs routes
 const eventsRoutes = require('./routes/eventsRoutes'); // Events routes
+const directoryRoutes = require('./routes/directoryRoutes'); // Directory routes
 // Temporarily disabled until we update middleware to use Supabase
 // const userRoutes = require('./routes/userRoutes');
-// const directoryRoutes = require('./routes/directoryRoutes');
 // const badgesRoutes = require('./routes/badgesRoutes');
 
 /**
@@ -140,9 +140,9 @@ app.use('/api/profile', profileRoutes); // Enhanced profile routes
 app.use('/api/posts', postsRoutes); // Social posts routes
 app.use('/api/jobs', jobsRoutes); // Jobs routes
 app.use('/api/events', eventsRoutes); // Events routes
+app.use('/api/directory', directoryRoutes); // Directory routes
 // Temporarily disabled until we update middleware to use Supabase
 // app.use('/api/users', userRoutes);
-// app.use('/api/directory', directoryRoutes);
 // app.use('/api/badges', badgesRoutes);
 
 // API documentation endpoint

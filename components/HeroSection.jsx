@@ -46,15 +46,15 @@ export default function HeroSection() {
             <div className="mt-16 flex flex-col sm:flex-row items-center justify-center gap-8 text-foreground-muted">
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-success rounded-full animate-pulse" />
-                <span className="text-sm">1000+ Active Alumni</span>
+                <span className="text-sm"></span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
-                <span className="text-sm">500+ Connections Made</span>
+                <span className="text-sm"></span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 bg-chart-2 rounded-full animate-pulse" />
-                <span className="text-sm">50+ Events Hosted</span>
+                <span className="text-sm"></span>
               </div>
             </div>
           </div>

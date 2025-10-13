@@ -18,7 +18,7 @@ const getPosts = catchAsync(async (req, res, next) => {
     .from('posts')
     .select(`
       *,
-      users!posts_author_id_fkey (
+      author:users!posts_author_id_fkey (
         id,
         first_name,
         last_name,
@@ -69,13 +69,13 @@ const getPosts = catchAsync(async (req, res, next) => {
         isLiked: !!userLike,
         likes: post.likes_count || 0,
         commentsCount: post.comments_count || 0,
-        author: post.users ? {
-          id: post.users.id,
-          name: `${post.users.first_name || ''} ${post.users.last_name || ''}`.trim(),
-          designation: post.users.current_position || 'Alumni',
-          company: post.users.company || 'Not specified',
-          batch: post.users.passing_year || 'Not specified',
-          avatar: post.users.avatar_path
+        author: post.author ? {
+          id: post.author.id,
+          name: `${post.author.first_name || ''} ${post.author.last_name || ''}`.trim(),
+          designation: post.author.current_position || 'Alumni',
+          company: post.author.company || 'Not specified',
+          batch: post.author.passing_year || 'Not specified',
+          avatar: post.author.avatar_path
         } : null
       };
     })
@@ -105,7 +105,7 @@ const getPost = catchAsync(async (req, res, next) => {
     .from('posts')
     .select(`
       *,
-      users!posts_author_id_fkey (
+      author:users!posts_author_id_fkey (
         id,
         first_name,
         last_name,
@@ -139,12 +139,12 @@ const getPost = catchAsync(async (req, res, next) => {
     ...post,
     isLiked: !!userLike,
     author: {
-      id: post.users.id,
-      name: `${post.users.first_name} ${post.users.last_name}`,
-      designation: post.users.current_position || 'Alumni',
-      company: post.users.company || 'Not specified',
-      batch: post.users.passing_year || 'Not specified',
-      avatar: post.users.avatar_path
+      id: post.author.id,
+      name: `${post.author.first_name} ${post.author.last_name}`,
+      designation: post.author.current_position || 'Alumni',
+      company: post.author.company || 'Not specified',
+      batch: post.author.passing_year || 'Not specified',
+      avatar: post.author.avatar_path
     }
   };
 
@@ -180,7 +180,7 @@ const createPost = catchAsync(async (req, res, next) => {
     }])
     .select(`
       *,
-      users!posts_author_id_fkey (
+      author:users!posts_author_id_fkey (
         id,
         first_name,
         last_name,
@@ -202,12 +202,12 @@ const createPost = catchAsync(async (req, res, next) => {
     likes: 0,
     comments: 0,
     author: {
-      id: post.users.id,
-      name: `${post.users.first_name} ${post.users.last_name}`,
-      designation: post.users.current_position || 'Alumni',
-      company: post.users.company || 'Not specified',
-      batch: post.users.passing_year || 'Not specified',
-      avatar: post.users.avatar_path
+      id: post.author.id,
+      name: `${post.author.first_name} ${post.author.last_name}`,
+      designation: post.author.current_position || 'Alumni',
+      company: post.author.company || 'Not specified',
+      batch: post.author.passing_year || 'Not specified',
+      avatar: post.author.avatar_path
     }
   };
 
@@ -255,7 +255,7 @@ const updatePost = catchAsync(async (req, res, next) => {
     .eq('id', id)
     .select(`
       *,
-      users!posts_author_id_fkey (
+      author:users!posts_author_id_fkey (
         id,
         first_name,
         last_name,

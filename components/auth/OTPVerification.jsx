@@ -169,6 +169,31 @@ export default function OTPVerification({
         try {
           const session = await waitForSession()
           
+          // 🔧 CRITICAL: Sync session to server IMMEDIATELY before any navigation
+          if (session) {
+            console.log('🔐 [TEMP] OTPVerification: Syncing session to server before redirect...')
+            try {
+              const syncResponse = await fetch('/api/auth/session', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  access_token: session.access_token,
+                  refresh_token: session.refresh_token
+                })
+              })
+              
+              if (syncResponse.ok) {
+                console.log('🔐 [TEMP] OTPVerification: ✅ Session synced successfully')
+                // Wait for cookies to propagate
+                await new Promise(resolve => setTimeout(resolve, 500))
+              } else {
+                console.error('🔐 [TEMP] OTPVerification: ❌ Session sync failed')
+              }
+            } catch (syncError) {
+              console.error('🔐 [TEMP] OTPVerification: ❌ Session sync error:', syncError)
+            }
+          }
+          
           // Clear any pending session storage
           sessionStorage.removeItem('pendingVerificationEmail')
           sessionStorage.removeItem('pendingFirstName')

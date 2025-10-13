@@ -53,71 +53,72 @@ export function AuthProvider({ children }) {
     // Fetch or create user profile
     const fetchOrCreateProfile = async (userId, userEmail) => {
       try {
-        console.log('[AUTH_PROVIDER] 🔍 Fetching profile for user:', userId)
+        console.log('Fetching profile for user:', userId)
         
-        // 🔧 FIX: Use order + limit to avoid 406 errors with duplicates
-        const { data: rows, error: fetchError } = await supabase
+        // Try to fetch existing profile
+        const { data, error, status } = await supabase
           .from('users')
           .select('*')
           .eq('auth_id', userId)
-          .order('updated_at', { ascending: false })
-          .limit(1)
+          .maybeSingle()
 
-        if (fetchError) {
-          console.error('[AUTH_PROVIDER] ❌ Profile fetch error:', fetchError)
-          // Continue to try creating profile
+        if (error && status === 406) {
+          console.warn('Profile not found (406), creating via server endpoint...')
+          
+          // Create profile via server endpoint
+          const response = await fetch('/api/profile/create', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              auth_id: userId, 
+              email: userEmail 
+            })
+          })
+
+          if (!response.ok) {
+            const text = await response.text()
+            console.error('Server profile creation failed:', text)
+            return null
+          }
+
+          const result = await response.json()
+          console.log('✅ Profile created via server endpoint')
+          return result.data
         }
 
-        const existingProfile = rows && rows.length > 0 ? rows[0] : null
-        
-        if (existingProfile) {
-          console.log('[AUTH_PROVIDER] ✅ Profile already exists, skipping creation')
-          return existingProfile
+        if (error) {
+          console.error('Profile fetch error:', error)
+          return null
+        }
+
+        if (data) {
+          console.log('✅ Profile found in database')
+          return data
         }
 
         // No profile found, create one
-        console.log('[AUTH_PROVIDER] 📝 Creating basic profile stub...')
+        console.log('No profile found, creating...')
         const response = await fetch('/api/profile/create', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ 
             auth_id: userId, 
-            email: userEmail,
-            profile_completed: false  // 🔧 FIX: Explicitly set to false for stub creation
+            email: userEmail 
           })
         })
 
-        const responseData = await response.json()
-        console.log('[AUTH_PROVIDER] Profile creation response:', { status: response.status, data: responseData })
-
-        if (response.ok && responseData.data) {
-          console.log('[AUTH_PROVIDER] ✅ Profile stub created successfully')
-          return responseData.data
-        } else if (response.status === 409 || response.status === 200) {
-          // 🔧 FIX: Handle 409 gracefully - profile already exists, fetch it again
-          console.log('[AUTH_PROVIDER] ℹ️ Profile already exists (409/200), fetching it...')
-          
-          // Fetch the existing profile using safe method
-          const { data: refetchRows } = await supabase
-            .from('users')
-            .select('*')
-            .eq('auth_id', userId)
-            .order('updated_at', { ascending: false })
-            .limit(1)
-          
-          const refetchedProfile = refetchRows && refetchRows.length > 0 ? refetchRows[0] : null
-          if (refetchedProfile) {
-            console.log('[AUTH_PROVIDER] ✅ Fetched existing profile after 409/200')
-            return refetchedProfile
-          }
-          return null
+        if (response.ok) {
+          const result = await response.json()
+          console.log('✅ Profile created successfully')
+          return result.data
         } else {
-          console.error('[AUTH_PROVIDER] ❌ Profile creation failed:', responseData)
+          const errorText = await response.text()
+          console.error('Profile creation failed:', errorText)
           return null
         }
 
       } catch (err) {
-        console.error('[AUTH_PROVIDER] ❌ Profile fetch/create error:', err)
+        console.error('Profile fetch/create error:', err)
         return null
       }
     }
@@ -224,7 +225,6 @@ export function AuthProvider({ children }) {
             
             // Handle profile creation for new sessions
             console.log('[AUTH_PROVIDER] SIGNED_IN event - triggering profile fetch/create')
-            // 🔧 FIX: Only create profile if we don't already have one in the current context
             await fetchOrCreateProfile(session.user.id, session.user.email)
           }
           
@@ -328,17 +328,14 @@ export function AuthProvider({ children }) {
       })
 
       // Check if profile exists
-      const { data: profileRows, error: profileErr } = await supabase
+      const { data: profile, error: profileErr } = await supabase
         .from('users')
         .select('*')
         .eq('auth_id', currentUser.id)
-        .order('updated_at', { ascending: false })
-        .limit(1)
-      
-      const profile = profileRows && profileRows.length > 0 ? profileRows[0] : null
+        .single()
 
       // If profile doesn't exist, create it via server endpoint
-      if (!profile || profileErr) {
+      if (profileErr && (profileErr.code === 'PGRST116' || profileErr.status === 404)) {
         console.log('Profile not found, creating via server endpoint...')
         
         try {

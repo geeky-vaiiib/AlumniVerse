@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { debounce } from "../../lib/utils"
+import MainLayout from "../layouts/MainLayout"
 import DirectorySidebar from "./DirectorySidebar"
 import AlumniGrid from "./AlumniGrid"
 import Pagination from "./Pagination"
@@ -81,50 +82,28 @@ export default function AlumniDirectory() {
   const currentPage = pagination.currentPage || 1
   const totalCount = pagination.totalCount || 0
 
+  const sidebarContent = (
+    <DirectorySidebar
+      filters={filters}
+      onFilterChange={handleFilterChange}
+      totalResults={totalCount}
+    />
+  )
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-surface border-b border-border-subtle">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-foreground">Alumni Directory</h1>
-              <p className="text-foreground-muted mt-1">
-                Connect with {totalCount} alumni from your network
-              </p>
-            </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-primary">{totalCount}</div>
-              <div className="text-sm text-foreground-muted">Alumni Found</div>
-            </div>
-          </div>
-        </div>
+    <MainLayout 
+      title="Alumni Directory" 
+      subtitle={`Connect with ${totalCount} alumni from your network`}
+      rightSidebar={sidebarContent}
+    >
+      <div className="space-y-6">
+        <AlumniGrid alumni={alumni} isLoading={isLoading} onConnect={handleConnect} />
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
+        )}
       </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar */}
-          <div className="lg:w-80 flex-shrink-0">
-            <DirectorySidebar
-              filters={filters}
-              onFilterChange={handleFilterChange}
-              totalResults={totalCount}
-            />
-          </div>
-
-          {/* Main content */}
-          <div className="flex-1">
-            <AlumniGrid alumni={alumni} isLoading={isLoading} onConnect={handleConnect} />
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="mt-8">
-                <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    </div>
+    </MainLayout>
   )
 }

@@ -36,11 +36,17 @@ export function usePosts() {
   const createPost = async (postData) => {
     try {
       const token = session?.access_token
-      const response = await apiService.posts.create(postData, token)
+      const response = await apiService.posts.create({
+        content: postData.content,
+        post_type: postData.type || 'general',
+        images: postData.images || [],
+        tags: postData.tags || []
+      }, token)
       
-      if (response.success) {
-        await fetchPosts() // Refresh posts
-        return response.data
+      if (response.success && response.data) {
+        // Refresh posts to get the latest data
+        await fetchPosts()
+        return response.data.post
       } else {
         throw new Error(response.message || 'Failed to create post')
       }
@@ -67,51 +73,84 @@ export function usePosts() {
 
 // Hook for managing alumni data
 export function useAlumni() {
-  const [alumni, setAlumni] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [alumniData, setAlumniData] = useState({
+    alumni: [],
+    pagination: {}
+  })
+  const [alumniLoading, setAlumniLoading] = useState(true)
+  const [alumniError, setAlumniError] = useState(null)
+  const [filters, setFilters] = useState({})
   const { session } = useAuth()
 
-  const fetchAlumni = async (filters = {}) => {
+  const loadAlumni = async (appliedFilters = {}) => {
     try {
-      setLoading(true)
+      setAlumniLoading(true)
       const token = session?.access_token
-      // This would use your actual API service
-      // For now, return mock data
-      const mockAlumni = [
-        {
-          id: '1',
-          name: 'John Doe',
-          batch: '2020',
-          branch: 'Computer Science',
-          company: 'Google',
-          designation: 'Software Engineer',
-          location: 'Bangalore'
+      
+      // Build query parameters
+      const params = new URLSearchParams()
+      Object.entries(appliedFilters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value)
         }
-      ]
-      setAlumni(mockAlumni)
-      setError(null)
+      })
+      
+      const endpoint = `/directory${params.toString() ? `?${params.toString()}` : ''}`
+      const response = await apiService.request(endpoint, {
+        headers: {
+          ...(token && { 'Authorization': `Bearer ${token}` })
+        }
+      })
+      
+      if (response.success && response.data) {
+        setAlumniData({
+          alumni: response.data.alumni || [],
+          pagination: response.data.pagination || {}
+        })
+      } else {
+        setAlumniData({ alumni: [], pagination: {} })
+      }
+      setAlumniError(null)
     } catch (err) {
       console.error('Error fetching alumni:', err)
-      setError(err.message)
-      setAlumni([])
+      setAlumniError(err.message)
+      setAlumniData({ alumni: [], pagination: {} })
     } finally {
-      setLoading(false)
+      setAlumniLoading(false)
+    }
+  }
+
+  const updateFilters = (newFilters) => {
+    setFilters(newFilters)
+    loadAlumni(newFilters)
+  }
+
+  const connectWithAlumni = async (alumniId) => {
+    try {
+      // Connection logic would go here
+      console.log('Connecting with alumni:', alumniId)
+      return { success: true }
+    } catch (err) {
+      console.error('Error connecting with alumni:', err)
+      return { success: false, error: err.message }
     }
   }
 
   useEffect(() => {
     if (session) {
-      fetchAlumni()
+      loadAlumni(filters)
     }
   }, [session])
 
   return {
-    alumni,
-    loading,
-    error,
-    fetchAlumni,
-    refreshAlumni: fetchAlumni
+    alumni: alumniData.alumni,
+    alumniData,
+    alumniLoading,
+    alumniError,
+    loadAlumni,
+    updateFilters,
+    connectWithAlumni,
+    refreshAlumni: () => loadAlumni(filters)
   }
 }
 

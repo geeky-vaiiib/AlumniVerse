@@ -1,270 +1,305 @@
 "use client"
 
-import { useState, useEffect } from "react"
-import JobSidebar from "./JobSidebar"
-import JobGrid from "./JobGrid"
-import JobPostModal from "./JobPostModal"
+import { useState, useEffect, useCallback } from "react"
+import { Card, CardContent } from "../ui/card"
 import { Button } from "../ui/button"
+import { Badge } from "../ui/badge"
+import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
+import JobPostModal from "./JobPostModal"
+import { getInitials } from "../../lib/utils"
+import { useJobsRealtime } from "../../hooks/useSupabaseRealtime"
+import apiService from "../../lib/api"
+import { getSupabaseClient } from "../../lib/supabase-singleton"
+import { Briefcase, MapPin, Clock, DollarSign, Bookmark, ExternalLink } from "lucide-react"
+
+const supabase = getSupabaseClient()
 
 const JobBoard = () => {
   const [jobs, setJobs] = useState([])
-  const [filteredJobs, setFilteredJobs] = useState([])
-  const [filters, setFilters] = useState({
-    search: "",
-    jobType: "all",
-    location: "all",
-    experience: "all",
-    company: "",
-  })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
   const [showPostModal, setShowPostModal] = useState(false)
   const [savedJobs, setSavedJobs] = useState([])
-  const [activeTab, setActiveTab] = useState("all") // all, saved
+  const [activeFilter, setActiveFilter] = useState("all") // all, saved
 
-  // Mock data - in real app, fetch from API
-  useEffect(() => {
-    const mockJobs = [
-      {
-        id: 1,
-        title: "Senior Software Engineer",
-        company: "Google",
-        location: "Bangalore, India",
-        type: "Full-time",
-        experience: "3-5 years",
-        salary: "₹25-35 LPA",
-        postedBy: {
-          name: "Rahul Sharma",
-          batch: "2019",
-          avatar: "/professional-male.jpg",
-        },
-        description: "Join our team to build scalable systems that impact billions of users.",
-        skills: ["React", "Node.js", "Python", "AWS"],
-        postedDate: "2024-01-15",
-        applicants: 45,
-        isRemote: false,
-      },
-      {
-        id: 2,
-        title: "Frontend Developer Intern",
-        company: "Microsoft",
-        location: "Hyderabad, India",
-        type: "Internship",
-        experience: "0-1 years",
-        salary: "₹50,000/month",
-        postedBy: {
-          name: "Priya Patel",
-          batch: "2020",
-          avatar: "/professional-female.png",
-        },
-        description: "Work on cutting-edge web technologies and learn from industry experts.",
-        skills: ["JavaScript", "React", "CSS", "HTML"],
-        postedDate: "2024-01-14",
-        applicants: 128,
-        isRemote: true,
-      },
-      {
-        id: 3,
-        title: "Data Scientist",
-        company: "Amazon",
-        location: "Chennai, India",
-        type: "Full-time",
-        experience: "2-4 years",
-        salary: "₹20-28 LPA",
-        postedBy: {
-          name: "Arjun Kumar",
-          batch: "2018",
-          avatar: "/professional-male-indian.jpg",
-        },
-        description: "Analyze large datasets to drive business decisions and improve customer experience.",
-        skills: ["Python", "Machine Learning", "SQL", "TensorFlow"],
-        postedDate: "2024-01-13",
-        applicants: 67,
-        isRemote: false,
-      },
-      {
-        id: 4,
-        title: "DevOps Engineer",
-        company: "Flipkart",
-        location: "Bangalore, India",
-        type: "Full-time",
-        experience: "1-3 years",
-        salary: "₹15-22 LPA",
-        postedBy: {
-          name: "Sneha Reddy",
-          batch: "2021",
-          avatar: "/professional-female-indian.jpg",
-        },
-        description: "Manage cloud infrastructure and automate deployment processes.",
-        skills: ["Docker", "Kubernetes", "AWS", "Jenkins"],
-        postedDate: "2024-01-12",
-        applicants: 34,
-        isRemote: true,
-      },
-      {
-        id: 5,
-        title: "Product Manager",
-        company: "Zomato",
-        location: "Gurgaon, India",
-        type: "Full-time",
-        experience: "3-6 years",
-        salary: "₹30-40 LPA",
-        postedBy: {
-          name: "Vikram Singh",
-          batch: "2017",
-          avatar: "/professional-male-manager.jpg",
-        },
-        description: "Lead product strategy and work with cross-functional teams.",
-        skills: ["Product Strategy", "Analytics", "User Research", "Agile"],
-        postedDate: "2024-01-11",
-        applicants: 89,
-        isRemote: false,
-      },
-      {
-        id: 6,
-        title: "Mobile App Developer",
-        company: "Paytm",
-        location: "Noida, India",
-        type: "Full-time",
-        experience: "2-4 years",
-        salary: "₹18-25 LPA",
-        postedBy: {
-          name: "Anita Joshi",
-          batch: "2019",
-          avatar: "/professional-female-developer.jpg",
-        },
-        description: "Develop and maintain mobile applications for millions of users.",
-        skills: ["React Native", "Flutter", "iOS", "Android"],
-        postedDate: "2024-01-10",
-        applicants: 56,
-        isRemote: true,
-      },
-    ]
-    setJobs(mockJobs)
-    setFilteredJobs(mockJobs)
+  // 🔄 Fetch jobs from API
+  const fetchJobs = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      const response = await apiService.jobs.getAll()
+      
+      if (response.success && response.data) {
+        setJobs(response.data.jobs || [])
+        console.log('✅ [JOBS] Loaded', response.data.jobs?.length || 0, 'jobs')
+      }
+    } catch (err) {
+      console.error('❌ [JOBS] Error fetching jobs:', err)
+      setError(err.message || 'Failed to load jobs')
+    } finally {
+      setLoading(false)
+    }
   }, [])
 
-  // Filter jobs based on current filters
+  // Initial load
   useEffect(() => {
-    let filtered = jobs
+    fetchJobs()
+  }, [fetchJobs])
 
-    if (activeTab === "saved") {
-      filtered = jobs.filter((job) => savedJobs.includes(job.id))
+  // 🔄 Real-time updates for jobs
+  const handleRealtimeUpdate = useCallback((payload) => {
+    console.log('🔄 [JOBS] Real-time update:', payload.eventType)
+    
+    if (payload.eventType === 'INSERT') {
+      setJobs(prev => [payload.new, ...prev])
+    } else if (payload.eventType === 'UPDATE') {
+      setJobs(prev => prev.map(job => 
+        job.id === payload.new.id ? payload.new : job
+      ))
+    } else if (payload.eventType === 'DELETE') {
+      setJobs(prev => prev.filter(job => job.id !== payload.old.id))
     }
+  }, [])
 
-    if (filters.search) {
-      filtered = filtered.filter(
-        (job) =>
-          job.title.toLowerCase().includes(filters.search.toLowerCase()) ||
-          job.company.toLowerCase().includes(filters.search.toLowerCase()) ||
-          job.skills.some((skill) => skill.toLowerCase().includes(filters.search.toLowerCase())),
-      )
-    }
-
-    if (filters.jobType !== "all") {
-      filtered = filtered.filter((job) => job.type.toLowerCase() === filters.jobType)
-    }
-
-    if (filters.location !== "all") {
-      if (filters.location === "remote") {
-        filtered = filtered.filter((job) => job.isRemote)
-      } else {
-        filtered = filtered.filter((job) => job.location.toLowerCase().includes(filters.location.toLowerCase()))
-      }
-    }
-
-    if (filters.experience !== "all") {
-      filtered = filtered.filter((job) => {
-        const jobExp = job.experience.toLowerCase()
-        switch (filters.experience) {
-          case "entry":
-            return jobExp.includes("0-1") || jobExp.includes("0-2")
-          case "mid":
-            return jobExp.includes("2-4") || jobExp.includes("3-5") || jobExp.includes("1-3")
-          case "senior":
-            return jobExp.includes("5+") || jobExp.includes("3-6") || jobExp.includes("4+")
-          default:
-            return true
-        }
-      })
-    }
-
-    if (filters.company) {
-      filtered = filtered.filter((job) => job.company.toLowerCase().includes(filters.company.toLowerCase()))
-    }
-
-    setFilteredJobs(filtered)
-  }, [jobs, filters, activeTab, savedJobs])
+  // Subscribe to real-time updates
+  useJobsRealtime(handleRealtimeUpdate)
 
   const handleSaveJob = (jobId) => {
-    setSavedJobs((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]))
+    setSavedJobs((prev) => 
+      prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]
+    )
   }
 
-  const handleJobPost = (jobData) => {
-    const newJob = {
-      id: jobs.length + 1,
-      ...jobData,
-      postedBy: {
-        name: "Current User", // In real app, get from auth context
-        batch: "2020",
-        avatar: "/current-user.jpg",
-      },
-      postedDate: new Date().toISOString().split("T")[0],
-      applicants: 0,
+  const handleJobPost = async (jobData) => {
+    try {
+      console.log('🔄 [JOBS] Posting job:', jobData)
+      const response = await apiService.jobs.create(jobData)
+      
+      if (response.success) {
+        console.log('✅ [JOBS] Job posted successfully')
+        setShowPostModal(false)
+        await fetchJobs() // Refresh jobs list
+      }
+    } catch (err) {
+      console.error('❌ [JOBS] Error posting job:', err)
+      alert('Failed to post job. Please try again.')
     }
-    setJobs((prev) => [newJob, ...prev])
-    setShowPostModal(false)
   }
 
-  return (
-    <div className="min-h-screen bg-gray-900 text-white">
-      {/* Header */}
-      <div className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-white">Job Board</h1>
-            <p className="text-gray-400 mt-1">Discover opportunities posted by fellow alumni</p>
-          </div>
-          <Button onClick={() => setShowPostModal(true)} className="bg-blue-600 hover:bg-blue-700">
+  const filteredJobs = activeFilter === "saved" 
+    ? jobs.filter((job) => savedJobs.includes(job.id))
+    : jobs
+
+  // 🔄 Loading state
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        {[1, 2, 3].map((i) => (
+          <Card key={i} className="bg-[#2D2D2D] border-[#3D3D3D]">
+            <CardContent className="p-6">
+              <div className="animate-pulse">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-10 h-10 bg-[#3D3D3D] rounded-full"></div>
+                  <div className="space-y-2">
+                    <div className="h-4 bg-[#3D3D3D] rounded w-32"></div>
+                    <div className="h-3 bg-[#3D3D3D] rounded w-24"></div>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="h-4 bg-[#3D3D3D] rounded"></div>
+                  <div className="h-4 bg-[#3D3D3D] rounded w-3/4"></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  // ❌ Error state
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <div className="mb-4">
+          <Button onClick={() => setShowPostModal(true)} className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">
+            <Briefcase className="w-4 h-4 mr-2" />
             Post a Job
           </Button>
         </div>
+        <Card className="bg-[#2D2D2D] border-[#3D3D3D]">
+          <CardContent className="p-12 text-center">
+            <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-4xl">⚠️</span>
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">Failed to Load Jobs</h3>
+            <p className="text-[#B0B0B0] mb-4">{error}</p>
+            <Button onClick={fetchJobs} className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">Try Again</Button>
+          </CardContent>
+        </Card>
+        {showPostModal && (
+          <JobPostModal onClose={() => setShowPostModal(false)} onSubmit={handleJobPost} />
+        )}
+      </div>
+    )
+  }
 
-        {/* Tabs */}
-        <div className="flex space-x-6 mt-4">
+  return (
+    <div className="space-y-6">
+      {/* Header Actions */}
+      <div className="flex items-center justify-between">
+        <div className="flex space-x-4">
           <button
-            onClick={() => setActiveTab("all")}
-            className={`pb-2 border-b-2 transition-colors ${
-              activeTab === "all"
-                ? "border-blue-500 text-blue-400"
-                : "border-transparent text-gray-400 hover:text-white"
+            onClick={() => setActiveFilter("all")}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              activeFilter === "all"
+                ? "bg-[#4A90E2] text-white"
+                : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
             }`}
           >
             All Jobs ({jobs.length})
           </button>
           <button
-            onClick={() => setActiveTab("saved")}
-            className={`pb-2 border-b-2 transition-colors ${
-              activeTab === "saved"
-                ? "border-blue-500 text-blue-400"
-                : "border-transparent text-gray-400 hover:text-white"
+            onClick={() => setActiveFilter("saved")}
+            className={`px-4 py-2 rounded-lg transition-colors ${
+              activeFilter === "saved"
+                ? "bg-[#4A90E2] text-white"
+                : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
             }`}
           >
             Saved Jobs ({savedJobs.length})
           </button>
         </div>
+        <Button onClick={() => setShowPostModal(true)} className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">
+          <Briefcase className="w-4 h-4 mr-2" />
+          Post a Job
+        </Button>
       </div>
 
-      <div className="flex">
-        {/* Sidebar */}
-        <JobSidebar filters={filters} setFilters={setFilters} />
+      {/* Jobs Grid */}
+      <div className="space-y-6">
+        {filteredJobs.length > 0 ? (
+          filteredJobs.map((job) => (
+            <Card key={job.id} className="bg-[#2D2D2D] border-[#3D3D3D] hover:border-[#4A90E2]/50 transition-colors">
+              <CardContent className="p-6">
+                <div className="flex items-start space-x-4">
+                  {/* Company/Poster Avatar */}
+                  <Avatar className="w-12 h-12">
+                    <AvatarImage src={job.postedBy.avatar} alt={job.postedBy.name} />
+                    <AvatarFallback className="bg-[#4A90E2] text-white">
+                      {getInitials(job.postedBy.name)}
+                    </AvatarFallback>
+                  </Avatar>
 
-        {/* Main Content */}
-        <div className="flex-1 p-6">
-          <JobGrid jobs={filteredJobs} savedJobs={savedJobs} onSaveJob={handleSaveJob} />
-        </div>
+                  <div className="flex-1">
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-3">
+                      <div>
+                        <h3 className="text-lg font-bold text-white">{job.title}</h3>
+                        <p className="text-[#B0B0B0] font-medium">{job.company}</p>
+                        <div className="flex items-center flex-wrap gap-3 text-sm text-[#B0B0B0] mt-2">
+                          <span className="flex items-center">
+                            <MapPin className="w-3 h-3 mr-1" />
+                            {job.location}
+                          </span>
+                          <span className="flex items-center">
+                            <Briefcase className="w-3 h-3 mr-1" />
+                            {job.type}
+                          </span>
+                          <span className="flex items-center">
+                            <Clock className="w-3 h-3 mr-1" />
+                            {job.experience}
+                          </span>
+                          <span className="flex items-center">
+                            <DollarSign className="w-3 h-3 mr-1" />
+                            {job.salary}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleSaveJob(job.id)}
+                          className={savedJobs.includes(job.id) ? "text-yellow-400" : "text-[#B0B0B0] hover:text-white"}
+                        >
+                          <Bookmark className={`w-4 h-4 ${savedJobs.includes(job.id) ? 'fill-current' : ''}`} />
+                        </Button>
+                        <Button size="sm" className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">
+                          <ExternalLink className="w-4 h-4 mr-2" />
+                          Apply Now
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <p className="text-[#B0B0B0] text-sm mb-3">{job.description}</p>
+
+                    {/* Skills */}
+                    {job.skills && job.skills.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {job.skills.map((skill, idx) => (
+                          <Badge
+                            key={idx}
+                            variant="outline"
+                            className="border-[#4A90E2] text-[#4A90E2] text-xs"
+                          >
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Footer */}
+                    <div className="flex items-center justify-between text-sm text-[#B0B0B0] border-t border-[#3D3D3D] pt-3">
+                      <div className="flex items-center space-x-2">
+                        <span>Posted by {job.postedBy.name}</span>
+                        {job.postedBy.batch && (
+                          <>
+                            <span>•</span>
+                            <span>Batch {job.postedBy.batch}</span>
+                          </>
+                        )}
+                        <span>•</span>
+                        <span>{new Date(job.postedDate).toLocaleDateString()}</span>
+                      </div>
+                      <span>{job.applicants} applicants</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))
+        ) : (
+          <Card className="bg-[#2D2D2D] border-[#3D3D3D]">
+            <CardContent className="p-12 text-center">
+              <div className="w-24 h-24 bg-[#3D3D3D] rounded-full flex items-center justify-center mx-auto mb-4">
+                <Briefcase className="w-12 h-12 text-[#B0B0B0]" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-2">
+                {activeFilter === "saved" ? "No Saved Jobs" : "No Jobs Posted Yet"}
+              </h3>
+              <p className="text-[#B0B0B0] mb-4">
+                {activeFilter === "saved" 
+                  ? "Save jobs you're interested in to view them here."
+                  : "Be the first to post a job opportunity for the AlumniVerse community!"
+                }
+              </p>
+              {activeFilter !== "saved" && (
+                <Button size="sm" className="bg-[#4A90E2] hover:bg-[#357ABD] text-white" onClick={() => setShowPostModal(true)}>
+                  <Briefcase className="w-4 h-4 mr-2" />
+                  Post First Job
+                </Button>
+              )}
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {/* Post Job Modal */}
-      {showPostModal && <JobPostModal onClose={() => setShowPostModal(false)} onSubmit={handleJobPost} />}
+      {showPostModal && (
+        <JobPostModal onClose={() => setShowPostModal(false)} onSubmit={handleJobPost} />
+      )}
     </div>
   )
 }

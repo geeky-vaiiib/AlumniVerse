@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
@@ -33,13 +34,39 @@ export async function POST(request) {
       accessTokenPrefix: access_token.substring(0, 20) + '...'
     })
     
-    // Create Supabase server client
-    const supabase = createClient()
+    // 🔧 CRITICAL: We need to create a NextResponse FIRST so we can set cookies on it
+    let response = NextResponse.json({ 
+      success: true,
+      message: 'Session synchronized to server',
+      userId: null
+    })
     
-    // Set the session on the server using the tokens
+    // Create Supabase server client with custom cookie handling that sets cookies on our response
+    const cookieStore = cookies()
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll(cookiesToSet) {
+            // 🔧 Set cookies on both the cookie store AND the response
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+              response.cookies.set(name, value, options)
+              console.log('🔐 [SESSION_API] Setting cookie:', name, '(length:', value?.length, ')')
+            })
+          },
+        },
+      }
+    )
+    
+    // Set the session on the server - this will trigger setAll() callback above
     const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
       access_token,
-      refresh_token: refresh_token || access_token // Fallback to access_token if no refresh_token
+      refresh_token: refresh_token || access_token
     })
     
     if (sessionError) {
@@ -56,35 +83,30 @@ export async function POST(request) {
       expiresAt: sessionData.session?.expires_at
     })
     
-    // Manually set additional cookies for extra reliability
-    const cookieStore = cookies()
-    
-    // Set access token cookie
-    cookieStore.set('sb-access-token', access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 60 * 60 * 24 * 7, // 7 days
-      path: '/'
-    })
-    
-    if (refresh_token) {
-      cookieStore.set('sb-refresh-token', refresh_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
-        maxAge: 60 * 60 * 24 * 30, // 30 days
-        path: '/'
-      })
-    }
-    
-    console.log('🔐 [SESSION_API] ✅ Server cookies set successfully')
-    
-    return NextResponse.json({ 
+    // Update response with user ID
+    response = NextResponse.json({ 
       success: true,
       message: 'Session synchronized to server',
       userId: sessionData.session?.user?.id
     })
+    
+    // Make sure cookies are set on the response
+    const allCookies = cookieStore.getAll()
+    allCookies.forEach(cookie => {
+      if (cookie.name.includes('sb-') || cookie.name.includes('auth')) {
+        response.cookies.set(cookie.name, cookie.value, {
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7,
+          path: '/'
+        })
+      }
+    })
+    
+    console.log('🔐 [SESSION_API] ✅ Cookies set on response successfully')
+    
+    return response
     
   } catch (error) {
     console.error('🔐 [SESSION_API] ❌ Unexpected error:', error)

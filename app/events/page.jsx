@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/providers/AuthProvider"
 import EventsPage from "@/components/events/EventsPage"
+import DashboardLayout from "@/components/layouts/DashboardLayout"
 
 export default function Events() {
   const { user, loading } = useAuth()
@@ -34,5 +35,13 @@ export default function Events() {
     )
   }
 
-  return <EventsPage />
+  return (
+    <DashboardLayout
+      title="Events"
+      subtitle="Stay updated with upcoming alumni events"
+      activeTab="events"
+    >
+      <EventsPage />
+    </DashboardLayout>
+  )
 }

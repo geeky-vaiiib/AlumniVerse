@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/components/providers/AuthProvider"
 import JobBoard from "@/components/jobs/JobBoard"
+import DashboardLayout from "@/components/layouts/DashboardLayout"
 
 export default function JobsPage() {
   const { user, loading } = useAuth()
@@ -34,5 +35,13 @@ export default function JobsPage() {
     )
   }
 
-  return <JobBoard />
+  return (
+    <DashboardLayout
+      title="Job Board"
+      subtitle="Find opportunities from your alumni network"
+      activeTab="jobs"
+    >
+      <JobBoard />
+    </DashboardLayout>
+  )
 }
