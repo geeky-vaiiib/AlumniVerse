@@ -1,18 +1,73 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "../ui/card"
 import { Button } from "../ui/button"
 import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import CreateEventModal from "./CreateEventModal"
 import { getInitials } from "../../lib/utils"
-import { useEventsRealtime } from "../../hooks/useSupabaseRealtime"
-import apiService from "../../lib/api"
-import { getSupabaseClient } from "../../lib/supabase-singleton"
 import { Calendar, Clock, MapPin, Users, Share2, Video } from "lucide-react"
 
-const supabase = getSupabaseClient()
+// Demo events data
+const DEMO_EVENTS = [
+  {
+    id: '1',
+    title: 'Annual Alumni Reunion 2024',
+    date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+    time: '10:00 AM - 6:00 PM',
+    location: 'SIT Main Auditorium, Tumkur',
+    isVirtual: false,
+    category: 'Reunions',
+    description: 'Join us for the biggest alumni gathering of the year! Meet old friends, network with successful alumni, and celebrate our shared legacy. Food and refreshments will be provided.',
+    attendees: 156,
+    maxAttendees: 500,
+    organizer: { name: 'Alumni Association', batch: '2015', avatar: null },
+    tags: ['networking', 'reunion', 'celebration']
+  },
+  {
+    id: '2',
+    title: 'Tech Career Workshop - AI & ML',
+    date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+    time: '2:00 PM - 5:00 PM',
+    location: 'Online via Zoom',
+    isVirtual: true,
+    category: 'Workshops',
+    description: 'Learn about the latest trends in AI/ML careers from Google and Microsoft engineers. Interactive Q&A session included. Certificate of participation provided.',
+    attendees: 89,
+    maxAttendees: 200,
+    organizer: { name: 'Career Development Cell', batch: '2020', avatar: null },
+    tags: ['AI', 'ML', 'careers', 'workshop']
+  },
+  {
+    id: '3',
+    title: 'Startup Networking Night',
+    date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+    time: '6:00 PM - 9:00 PM',
+    location: 'Bangalore Tech Hub',
+    isVirtual: false,
+    category: 'Networking',
+    description: 'Connect with fellow alumni entrepreneurs, investors, and startup enthusiasts. Pitch your ideas and find potential co-founders! Dinner included.',
+    attendees: 45,
+    maxAttendees: 100,
+    organizer: { name: 'Entrepreneurship Cell', batch: '2018', avatar: null },
+    tags: ['startup', 'networking', 'investors']
+  },
+  {
+    id: '4',
+    title: 'Alumni Webinar: Career in Cloud Computing',
+    date: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+    time: '7:00 PM - 8:30 PM',
+    location: 'Google Meet',
+    isVirtual: true,
+    category: 'Webinars',
+    description: 'Join our senior alumni working at AWS and Azure to learn about career opportunities in cloud computing. Live Q&A at the end.',
+    attendees: 120,
+    maxAttendees: 300,
+    organizer: { name: 'Tech Alumni Network', batch: '2017', avatar: null },
+    tags: ['cloud', 'AWS', 'Azure', 'webinar']
+  }
+]
 
 const EventsPage = () => {
   const [events, setEvents] = useState([])
@@ -22,62 +77,80 @@ const EventsPage = () => {
   const [activeFilter, setActiveFilter] = useState("all")
   const [registeredEvents, setRegisteredEvents] = useState([])
 
-  const fetchEvents = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const response = await apiService.events.getAll()
-      if (response.success && response.data) {
-        setEvents(response.data.events || [])
-        console.log('✅ [EVENTS] Loaded', response.data.events?.length || 0, 'events')
-      }
-    } catch (err) {
-      console.error('❌ [EVENTS] Error:', err)
-      setError(err.message || 'Failed to load events')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
+  // Initialize with Firestore data + Demo data
   useEffect(() => {
-    fetchEvents()
-  }, [fetchEvents])
+    const fetchEvents = async () => {
+      try {
+        setLoading(true)
 
-  const handleRealtimeUpdate = useCallback((payload) => {
-    if (payload.eventType === 'INSERT') {
-      setEvents(prev => [payload.new, ...prev])
-    } else if (payload.eventType === 'UPDATE') {
-      setEvents(prev => prev.map(e => e.id === payload.new.id ? payload.new : e))
-    } else if (payload.eventType === 'DELETE') {
-      setEvents(prev => prev.filter(e => e.id !== payload.old.id))
+        // Dynamic import for Firestore
+        const { collection, getDocs, query, orderBy, limit } = await import('firebase/firestore')
+        const { db } = await import('../../lib/firebase')
+
+        const eventsRef = collection(db, 'events')
+        const q = query(eventsRef, orderBy('date', 'asc'), limit(20))
+        const snapshot = await getDocs(q)
+
+        const firestoreEvents = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+
+        console.log('✅ [EVENTS] Loaded', firestoreEvents.length, 'events from Firestore')
+        setEvents([...firestoreEvents, ...DEMO_EVENTS])
+      } catch (error) {
+        console.error('❌ [EVENTS] Error loading from Firestore:', error)
+        // Fallback to demo data
+        setEvents(DEMO_EVENTS)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [])
 
-  useEventsRealtime(handleRealtimeUpdate)
+    fetchEvents()
+  }, [])
 
   const handleCreateEvent = async (eventData) => {
     try {
-      const { session } = await supabase.auth.getSession()
-      const response = await apiService.events.create(eventData, session?.access_token)
-      
-      if (response.success) {
-        console.log('✅ [EVENTS] Event created successfully')
-        setShowCreateModal(false)
-        await fetchEvents() // Refresh events list
+      console.log('🔄 [EVENTS] Creating event in Firestore:', eventData)
+
+      const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
+      const { db } = await import('../../lib/firebase')
+      const { auth } = await import('../../lib/firebase')
+
+      const user = auth.currentUser
+
+      const newEvent = {
+        ...eventData,
+        createdAt: serverTimestamp(),
+        attendees: 0,
+        organizerId: user?.uid,
+        organizer: {
+          name: user?.displayName || 'Alumni Member',
+          batch: '2024',
+          avatar: user?.photoURL || null
+        }
       }
+
+      const docRef = await addDoc(collection(db, 'events'), newEvent)
+
+      const eventWithId = { ...newEvent, id: docRef.id }
+      setEvents(prev => [eventWithId, ...prev])
+      setShowCreateModal(false)
+      console.log('✅ [EVENTS] Event created successfully:', docRef.id)
     } catch (err) {
       console.error('❌ [EVENTS] Error creating event:', err)
-      alert('Failed to create event. Please try again.')
+      alert('Failed to create event: ' + err.message)
     }
   }
 
   const handleRegisterEvent = (eventId) => {
-    setRegisteredEvents(prev => 
+    setRegisteredEvents(prev =>
       prev.includes(eventId) ? prev.filter(id => id !== eventId) : [...prev, eventId]
     )
   }
 
-  const filteredEvents = activeFilter === "registered" 
+  const filteredEvents = activeFilter === "registered"
     ? events.filter(e => registeredEvents.includes(e.id))
     : events
 
@@ -108,33 +181,6 @@ const EventsPage = () => {
     )
   }
 
-  // Error state
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="mb-4">
-          <Button onClick={() => setShowCreateModal(true)} className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">
-            <Calendar className="w-4 h-4 mr-2" />
-            Create Event
-          </Button>
-        </div>
-        <Card className="bg-[#2D2D2D] border-[#3D3D3D]">
-          <CardContent className="p-12 text-center">
-            <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">⚠️</span>
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Failed to Load Events</h3>
-            <p className="text-[#B0B0B0] mb-4">{error}</p>
-            <Button onClick={fetchEvents} className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">Try Again</Button>
-          </CardContent>
-        </Card>
-        {showCreateModal && (
-          <CreateEventModal onClose={() => setShowCreateModal(false)} onSubmit={handleCreateEvent} />
-        )}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Header Actions */}
@@ -142,21 +188,19 @@ const EventsPage = () => {
         <div className="flex space-x-4">
           <button
             onClick={() => setActiveFilter("all")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeFilter === "all"
-                ? "bg-[#4A90E2] text-white"
-                : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
-            }`}
+            className={`px-4 py-2 rounded-lg transition-colors ${activeFilter === "all"
+              ? "bg-[#4A90E2] text-white"
+              : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
+              }`}
           >
             All Events ({events.length})
           </button>
           <button
             onClick={() => setActiveFilter("registered")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeFilter === "registered"
-                ? "bg-[#4A90E2] text-white"
-                : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
-            }`}
+            className={`px-4 py-2 rounded-lg transition-colors ${activeFilter === "registered"
+              ? "bg-[#4A90E2] text-white"
+              : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
+              }`}
           >
             Registered ({registeredEvents.length})
           </button>
@@ -194,10 +238,10 @@ const EventsPage = () => {
                           <div className="flex items-center flex-wrap gap-3 text-sm text-[#B0B0B0] mt-2">
                             <span className="flex items-center">
                               <Calendar className="w-3 h-3 mr-1" />
-                              {eventDate.toLocaleDateString('en-US', { 
-                                weekday: 'short', 
-                                month: 'short', 
-                                day: 'numeric' 
+                              {eventDate.toLocaleDateString('en-US', {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric'
                               })}
                             </span>
                             <span className="flex items-center">
@@ -215,12 +259,11 @@ const EventsPage = () => {
                           <div className="flex items-center space-x-2 mt-2">
                             <Badge
                               variant="outline"
-                              className={`text-xs ${
-                                event.category === 'Reunions' ? 'border-purple-500 text-purple-400' :
+                              className={`text-xs ${event.category === 'Reunions' ? 'border-purple-500 text-purple-400' :
                                 event.category === 'Workshops' ? 'border-green-500 text-green-400' :
-                                event.category === 'Webinars' ? 'border-blue-500 text-blue-400' :
-                                'border-orange-500 text-orange-400'
-                              }`}
+                                  event.category === 'Webinars' ? 'border-blue-500 text-blue-400' :
+                                    'border-orange-500 text-orange-400'
+                                }`}
                             >
                               {event.category}
                             </Badge>
@@ -245,10 +288,10 @@ const EventsPage = () => {
                             <Button variant="ghost" size="sm" className="text-[#B0B0B0] hover:text-white">
                               <Share2 className="w-4 h-4" />
                             </Button>
-                            <Button 
-                              size="sm" 
+                            <Button
+                              size="sm"
                               onClick={() => handleRegisterEvent(event.id)}
-                              className={registeredEvents.includes(event.id) 
+                              className={registeredEvents.includes(event.id)
                                 ? "bg-green-600 hover:bg-green-700 text-white"
                                 : "bg-[#4A90E2] hover:bg-[#357ABD] text-white"
                               }
@@ -310,7 +353,7 @@ const EventsPage = () => {
                 {activeFilter === "registered" ? "No Registered Events" : "No Events Yet"}
               </h3>
               <p className="text-[#B0B0B0] mb-4">
-                {activeFilter === "registered" 
+                {activeFilter === "registered"
                   ? "Register for events to see them here."
                   : "Be the first to create an event for the AlumniVerse community!"
                 }

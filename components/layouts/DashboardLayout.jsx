@@ -1,20 +1,61 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import StatsSidebar from "./StatsSidebar"
 import UnifiedNavbar from "./UnifiedNavbar"
+import { useAuth } from "../providers/AuthProvider"
 
 /**
  * Unified Dashboard Layout
  * Ensures consistent 3-column layout across all dashboard pages
  * (Feed, Jobs, Events, Directory, etc.)
+ * 
+ * Includes client-side auth protection for Firebase mode
  */
-export default function DashboardLayout({ 
+export default function DashboardLayout({
   children,
   title = "Dashboard",
   subtitle = "Welcome back to your alumni network",
   activeTab = "feed"
 }) {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+  const [isClient, setIsClient] = useState(false)
+
+  useEffect(() => {
+    setIsClient(true)
+  }, [])
+
+  // Client-side auth protection
+  useEffect(() => {
+    if (isClient && !loading && !user) {
+      console.log('[DASHBOARD_LAYOUT] No user found, redirecting to login')
+      router.push('/login')
+    }
+  }, [isClient, loading, user, router])
+
+  // Show loading while checking auth
+  if (loading || !isClient) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    )
+  }
+
+  // If not authenticated, don't render (redirect is happening)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-foreground-muted">Redirecting to login...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}

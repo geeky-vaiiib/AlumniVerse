@@ -1,14 +1,23 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useAuth } from "@/components/providers/AuthProvider"
 import { useRouter } from "next/navigation"
 
 export default function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
   const { user, signOut, loading } = useAuth()
   const router = useRouter()
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setScrolled(window.scrollY > 20)
+    }
+    window.addEventListener('scroll', handleScroll)
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [])
 
   const handleSignOut = async () => {
     await signOut()
@@ -23,78 +32,80 @@ export default function Navbar() {
         block: 'start'
       })
     }
-    setIsMenuOpen(false) // Close mobile menu after clicking
+    setIsMenuOpen(false)
   }
 
   return (
-    <nav className="sticky top-0 z-50 glass border-b border-border-subtle">
+    <nav className={`sticky top-0 z-50 transition-all duration-300 ${scrolled
+        ? 'bg-background/80 backdrop-blur-glass border-b border-border shadow-lg shadow-black/5'
+        : 'bg-transparent border-b border-transparent'
+      }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo */}
           <div className="flex items-center">
-            <div className="flex-shrink-0">
-              <Link href="/" className="flex items-center space-x-2">
-                <svg className="w-8 h-8 text-primary" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 2L13.5 8.5L20 7L14.5 12L21 17L13.5 15.5L12 22L10.5 15.5L4 17L9.5 12L3 7L10.5 8.5L12 2Z"/>
-                </svg>
-                <h1 className="text-2xl font-bold gradient-text">AlumniVerse</h1>
-              </Link>
-            </div>
+            <Link href="/" className="flex items-center space-x-3 group">
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-primary to-accent-blue rounded-lg blur-sm opacity-50 group-hover:opacity-75 transition-opacity" />
+                <div className="relative w-10 h-10 rounded-lg bg-gradient-to-r from-primary to-accent-blue flex items-center justify-center">
+                  <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2L13.5 8.5L20 7L14.5 12L21 17L13.5 15.5L12 22L10.5 15.5L4 17L9.5 12L3 7L10.5 8.5L12 2Z" />
+                  </svg>
+                </div>
+              </div>
+              <span className="text-xl font-bold gradient-text">AlumniVerse</span>
+            </Link>
           </div>
 
           {/* Desktop Navigation - Center */}
-          <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-8">
+          <div className="hidden md:flex items-center space-x-1">
+            {['Features', 'About', 'Contact'].map((item) => (
               <button
-                onClick={() => scrollToSection('features')}
-                className="relative group text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
+                key={item}
+                onClick={() => scrollToSection(item.toLowerCase() === 'contact' ? 'footer' : item.toLowerCase())}
+                className="relative px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors group"
               >
-                Features
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                {item}
+                <span className="absolute inset-x-2 -bottom-px h-px bg-gradient-to-r from-primary/0 via-primary to-primary/0 opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
-              <button
-                onClick={() => scrollToSection('about')}
-                className="relative group text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
-              >
-                About
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-              </button>
-              <button
-                onClick={() => scrollToSection('footer')}
-                className="relative group text-foreground-muted hover:text-foreground px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
-              >
-                Contact
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-              </button>
-            </div>
+            ))}
           </div>
 
           {/* Right Side - Auth Buttons */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden md:flex items-center space-x-3">
             {user ? (
               <>
-                <Link href="/profile" className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
-                  Profile
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-                </Link>
-                <Link href="/dashboard" className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+                <Link
+                  href="/dashboard"
+                  className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
+                >
                   Dashboard
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
                 </Link>
-                <button 
+                <Link
+                  href="/profile"
+                  className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
+                >
+                  Profile
+                </Link>
+                <button
                   onClick={handleSignOut}
-                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90 px-4 py-2 rounded-md transition-colors"
+                  className="px-4 py-2 rounded-lg text-sm font-medium bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors"
                 >
                   Sign Out
                 </button>
               </>
             ) : (
               <>
-                <Link href="/login" className="relative group text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
+                <Link
+                  href="/login"
+                  className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
+                >
                   Login
-                  <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
                 </Link>
-                <Link href="/auth" className="bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors hover-glow">
+                <Link
+                  href="/auth"
+                  className="btn-gradient px-5 py-2.5 rounded-lg text-sm font-semibold"
+                >
                   Get Started
                 </Link>
               </>
@@ -105,54 +116,55 @@ export default function Navbar() {
           <div className="md:hidden">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-foreground-muted hover:text-foreground p-2"
+              className="p-2 rounded-lg text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
             >
               <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                {isMenuOpen ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                )}
               </svg>
             </button>
           </div>
         </div>
 
         {/* Mobile menu */}
-        {isMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3 border-t border-border-subtle">
+        <div className={`md:hidden overflow-hidden transition-all duration-300 ease-in-out ${isMenuOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+          }`}>
+          <div className="px-2 pt-2 pb-4 space-y-1 border-t border-border">
+            {['Features', 'About', 'Contact'].map((item) => (
               <button
-                onClick={() => scrollToSection('features')}
-                className="relative group text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left"
+                key={item}
+                onClick={() => scrollToSection(item.toLowerCase() === 'contact' ? 'footer' : item.toLowerCase())}
+                className="block w-full text-left px-4 py-3 rounded-lg text-base font-medium text-foreground-muted hover:text-foreground hover:bg-surface transition-colors"
               >
-                Features
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+                {item}
               </button>
-              <button
-                onClick={() => scrollToSection('about')}
-                className="relative group text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left"
-              >
-                About
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-              </button>
-              <button
-                onClick={() => scrollToSection('footer')}
-                className="relative group text-foreground-muted hover:text-foreground block px-3 py-2 text-base font-medium w-full text-left"
-              >
-                Contact
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
-              </button>
-              <div className="pt-4 pb-3 border-t border-border-subtle">
-                <div className="flex items-center space-x-3">
-                  <button className="relative group w-full text-foreground-muted hover:text-foreground px-4 py-2 rounded-md transition-colors">
-                    <a href="/auth">Login</a>
-                    <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-primary group-hover:w-full transition-all duration-300 ease-out"></span>
+            ))}
+            <div className="pt-4 space-y-2">
+              {user ? (
+                <>
+                  <Link href="/dashboard" className="block w-full px-4 py-3 rounded-lg text-center font-medium bg-surface hover:bg-surface-hover transition-colors">
+                    Dashboard
+                  </Link>
+                  <button onClick={handleSignOut} className="block w-full px-4 py-3 rounded-lg text-center font-medium bg-destructive/10 text-destructive">
+                    Sign Out
                   </button>
-                  <button className="w-full bg-primary text-primary-foreground hover:bg-primary-hover px-4 py-2 rounded-md transition-colors">
-                    <a href="/auth?mode=signup">Get Started</a>
-                  </button>
-                </div>
-              </div>
+                </>
+              ) : (
+                <>
+                  <Link href="/login" className="block w-full px-4 py-3 rounded-lg text-center font-medium bg-surface hover:bg-surface-hover transition-colors">
+                    Login
+                  </Link>
+                  <Link href="/auth" className="block w-full px-4 py-3 rounded-lg text-center font-semibold btn-gradient">
+                    Get Started
+                  </Link>
+                </>
+              )}
             </div>
           </div>
-        )}
+        </div>
       </div>
     </nav>
   )

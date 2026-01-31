@@ -7,6 +7,9 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
+const logger = require('./utils/logger');
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
 
 // Import middleware
 const { globalErrorHandler, notFound } = require('./middlewares/errorMiddleware');
@@ -81,7 +84,7 @@ const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     const allowedOrigins = [
       process.env.FRONTEND_URL || 'http://localhost:3000',
       'http://localhost:3000',
@@ -89,7 +92,7 @@ const corsOptions = {
       'https://localhost:3000',
       'https://localhost:3001'
     ];
-    
+
     if (allowedOrigins.indexOf(origin) !== -1) {
       callback(null, true);
     } else {
@@ -131,6 +134,12 @@ app.get('/health', (req, res) => {
     version: '1.0.0'
   });
 });
+
+// Swagger API documentation
+app.use('/api/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: '.swagger-ui .topbar { display: none }',
+  customSiteTitle: 'AlumniVerse API Docs'
+}));
 
 // API routes
 app.use('/api/auth', authLimiter, supabaseAuthRoutes); // Supabase auth (primary)
@@ -219,20 +228,20 @@ const testSupabaseConnection = async () => {
 
     // Test database connection with a simple query
     const { data, error } = await supabase.from('users').select('count').limit(1);
-    
+
     if (error) {
       console.log(`❌ Supabase Database Connection Failed: ${error.message}`);
       return false;
     } else {
       console.log('✅ Supabase Database Connected Successfully!');
-      
+
       // Additional check: Verify auth_id column exists
       try {
         const { data: schemaData, error: schemaError } = await supabase.rpc('check_column_exists', {
           table_name: 'users',
           column_name: 'auth_id'
         });
-        
+
         if (schemaError) {
           console.log('⚠️ Could not verify auth_id column (this is okay)');
         } else {
@@ -241,7 +250,7 @@ const testSupabaseConnection = async () => {
       } catch (e) {
         console.log('⚠️ Schema check skipped (this is okay)');
       }
-      
+
       return true;
     }
   } catch (err) {
@@ -287,7 +296,7 @@ Ready to serve the AlumniVerse frontend! 🎓
   // Test Supabase connections
   console.log('\n🔍 Testing Supabase Connections...');
   console.log('✅ Supabase Auth ready!');
-  
+
   // Test database connection
   await testSupabaseConnection();
 });

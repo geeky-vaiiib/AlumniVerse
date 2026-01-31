@@ -8,16 +8,15 @@ import { generateAvatar } from "../../lib/utils"
 import { useAuth } from "../providers/AuthProvider"
 import { useUser } from "../../contexts/UserContext"
 import ProfileEditModal from "../profile/ProfileEditModal"
-import { Edit3 } from "lucide-react"
+import { Edit3, Home, Briefcase, Calendar, Users, LogOut } from "lucide-react"
 
 
-export default function DashboardSidebar({ activeTab, onTabChange = () => {}, onAddPost }) {
+export default function DashboardSidebar({ activeTab, onTabChange = () => { }, onAddPost }) {
   const router = useRouter()
   const { user } = useAuth()
   const { userProfile, getFullName } = useUser()
   const [isProfileEditOpen, setIsProfileEditOpen] = useState(false)
 
-  // Get user data from UserContext
   const currentUser = {
     name: getFullName(),
     email: userProfile?.email || user?.email || "",
@@ -33,19 +32,12 @@ export default function DashboardSidebar({ activeTab, onTabChange = () => {}, on
     leetcodeUrl: userProfile?.leetcodeUrl || "",
     resumeUrl: userProfile?.resumeUrl || "",
   }
-  
-  // 🔧 FIX: Real-time navigation handler
+
   const handleNavigation = (tabId) => {
-    console.log(`[DASHBOARD_SIDEBAR] 🎯 Navigating to: ${tabId}`)
-    
-    // Update active tab for UI state (only if onTabChange function exists)
     if (typeof onTabChange === 'function') {
       onTabChange(tabId)
-    } else {
-      console.warn('⚠️ onTabChange not provided or not a function')
     }
-    
-    // Navigate to actual route for real-time navigation
+
     switch (tabId) {
       case 'feed':
         router.push('/dashboard')
@@ -59,119 +51,115 @@ export default function DashboardSidebar({ activeTab, onTabChange = () => {}, on
       case 'directory':
         router.push('/directory')
         break
-      default:
-        console.warn(`[DASHBOARD_SIDEBAR] ⚠️ Unknown tab: ${tabId}`)
     }
   }
-  
+
   const avatar = generateAvatar(currentUser.name)
+
+  const navItems = [
+    { id: "feed", label: "News Feed", icon: Home },
+    { id: "jobs", label: "Job Board", icon: Briefcase },
+    { id: "events", label: "Events", icon: Calendar },
+    { id: "directory", label: "Directory", icon: Users },
+  ]
 
   return (
     <div className="space-y-6">
-      {/* Profile Edit Modal */}
-      <ProfileEditModal 
-        isOpen={isProfileEditOpen} 
-        onClose={() => setIsProfileEditOpen(false)} 
+      <ProfileEditModal
+        isOpen={isProfileEditOpen}
+        onClose={() => setIsProfileEditOpen(false)}
       />
 
       {/* User Profile Card */}
-      <Card className="bg-gradient-to-br from-primary/5 to-chart-2/5">
-        <CardContent className="p-6">
+      <Card className="glass-card border-0 overflow-hidden">
+        {/* Gradient header */}
+        <div className="h-20 bg-gradient-to-r from-primary/20 via-accent-blue/20 to-accent-teal/20" />
+
+        <CardContent className="px-6 pb-6 -mt-10">
           <div className="text-center">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center text-white font-bold text-xl mx-auto mb-4"
-              style={{ backgroundColor: avatar.backgroundColor }}
-            >
-              {avatar.initials}
+            {/* Avatar */}
+            <div className="relative inline-block">
+              <div
+                className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-bold text-xl ring-4 ring-background shadow-lg"
+                style={{ backgroundColor: avatar.backgroundColor }}
+              >
+                {avatar.initials}
+              </div>
+              <div className="absolute -bottom-1 -right-1 w-6 h-6 bg-accent-green rounded-full border-2 border-background flex items-center justify-center">
+                <span className="text-xs">✓</span>
+              </div>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-1">{currentUser.name}</h3>
-            <p className="text-foreground-muted text-sm mb-2">
+
+            <h3 className="mt-4 text-lg font-semibold text-foreground">{currentUser.name}</h3>
+            <p className="text-foreground-muted text-sm">
               {currentUser.designation} at {currentUser.company}
             </p>
-            <div className="flex items-center justify-center space-x-2 mb-4">
-              <span className="text-xs text-primary bg-primary/10 px-2 py-1 rounded">{currentUser.branch}</span>
+
+            {/* Tags */}
+            <div className="flex items-center justify-center gap-2 mt-3">
+              <span className="badge-primary">{currentUser.branch}</span>
               <span className="text-xs text-foreground-muted">Class of {currentUser.batch}</span>
             </div>
 
             {/* Profile completion */}
-            <div className="mb-4">
-              <div className="flex justify-between text-sm mb-1">
+            <div className="mt-6">
+              <div className="flex justify-between text-sm mb-2">
                 <span className="text-foreground-muted">Profile Completion</span>
-                <span className="text-primary font-medium">{currentUser.profileCompletion}%</span>
+                <span className="font-semibold text-primary">{currentUser.profileCompletion}%</span>
               </div>
-              <div className="w-full bg-muted rounded-full h-2">
+              <div className="h-2 bg-surface rounded-full overflow-hidden">
                 <div
-                  className="bg-gradient-to-r from-primary to-chart-2 h-2 rounded-full transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-primary to-accent-blue rounded-full transition-all duration-500"
                   style={{ width: `${currentUser.profileCompletion}%` }}
-                ></div>
+                />
               </div>
             </div>
 
-            {/* Quick links */}
-            <div className="flex justify-center space-x-4 mb-4">
-              {currentUser.resumeUrl && (
-                <a
-                  href={currentUser.resumeUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-foreground-muted hover:text-primary transition-colors"
-                  title="Resume"
-                >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </a>
-              )}
-
+            {/* Social Links */}
+            <div className="flex justify-center gap-3 mt-6">
               {currentUser.linkedinUrl && (
                 <a
                   href={currentUser.linkedinUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-foreground-muted hover:text-blue-500 transition-colors"
-                  title="LinkedIn"
+                  className="w-9 h-9 rounded-lg bg-surface hover:bg-surface-hover flex items-center justify-center text-foreground-muted hover:text-blue-500 transition-all"
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z" />
                   </svg>
                 </a>
               )}
-
               {currentUser.githubUrl && (
                 <a
                   href={currentUser.githubUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-foreground-muted hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
-                  title="GitHub"
+                  className="w-9 h-9 rounded-lg bg-surface hover:bg-surface-hover flex items-center justify-center text-foreground-muted hover:text-foreground transition-all"
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 10.956.69-.069-.5-.25-.5-.556v-2.237c-3.338.724-4.042-1.61-4.042-1.61C2.65 17.4 1.73 16.85 1.73 16.85c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.997.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.467-2.38 1.235-3.221-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.841 1.23 1.911 1.23 3.221 0 4.609-2.807 5.624-5.479 5.921.42.36.81 1.096.81 2.22v3.293c0 .319-.192.694-.801.576C20.565 21.795 24 17.3 24 11.987 24 5.367 18.624.001 12.017.001z"/>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 5.079 3.158 9.417 7.618 10.956.69-.069-.5-.25-.5-.556v-2.237c-3.338.724-4.042-1.61-4.042-1.61C2.65 17.4 1.73 16.85 1.73 16.85c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.997.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.467-2.38 1.235-3.221-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.841 1.23 1.911 1.23 3.221 0 4.609-2.807 5.624-5.479 5.921.42.36.81 1.096.81 2.22v3.293c0 .319-.192.694-.801.576C20.565 21.795 24 17.3 24 11.987 24 5.367 18.624.001 12.017.001z" />
                   </svg>
                 </a>
               )}
-
-              {currentUser.leetcodeUrl && (
+              {currentUser.resumeUrl && (
                 <a
-                  href={currentUser.leetcodeUrl}
+                  href={currentUser.resumeUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-foreground-muted hover:text-orange-500 transition-colors"
-                  title="LeetCode"
+                  className="w-9 h-9 rounded-lg bg-surface hover:bg-surface-hover flex items-center justify-center text-foreground-muted hover:text-accent-teal transition-all"
+                  title="Resume"
                 >
-                  <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                    <path d="M13.483 0a1.374 1.374 0 0 0-.961.438L7.116 6.226l-3.854 4.126a5.266 5.266 0 0 0-1.209 2.104 5.35 5.35 0 0 0-.125.513 5.527 5.527 0 0 0 .062 2.362 5.83 5.83 0 0 0 .349 1.017 5.938 5.938 0 0 0 1.271 1.818l4.277 4.193.039.038c2.248 2.165 5.852 2.133 8.063-.074l2.396-2.392c.54-.54.54-1.414.003-1.955a1.378 1.378 0 0 0-1.951-.003l-2.396 2.392a3.021 3.021 0 0 1-4.205.038l-.02-.019-4.276-4.193c-.652-.64-.972-1.469-.948-2.263a2.68 2.68 0 0 1 .066-.523 2.545 2.545 0 0 1 .619-1.164L9.13 8.114c1.058-1.134 3.204-1.27 4.43-.278l3.501 2.831c.593.48 1.461.387 1.94-.207a1.384 1.384 0 0 0-.207-1.943l-3.5-2.831c-.8-.647-1.766-1.045-2.774-1.202l2.015-2.158A1.384 1.384 0 0 0 13.483 0zm-2.866 12.815a1.38 1.38 0 0 0-1.38 1.382 1.38 1.38 0 0 0 1.38 1.382H20.79a1.38 1.38 0 0 0 1.38-1.382 1.38 1.38 0 0 0-1.38-1.382z"/>
+                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clipRule="evenodd" />
                   </svg>
                 </a>
               )}
             </div>
 
-            <div className="text-sm text-foreground-muted mb-4">
-              <span className="font-medium text-primary">{currentUser.connections}</span> connections
+            {/* Connections */}
+            <div className="mt-6 py-4 border-t border-border">
+              <span className="text-2xl font-bold text-foreground">{currentUser.connections}</span>
+              <span className="text-foreground-muted text-sm ml-2">connections</span>
             </div>
 
             {/* Edit Profile Button */}
@@ -179,7 +167,7 @@ export default function DashboardSidebar({ activeTab, onTabChange = () => {}, on
               variant="outline"
               size="sm"
               onClick={() => setIsProfileEditOpen(true)}
-              className="w-full bg-transparent border-border text-foreground hover:bg-surface-hover"
+              className="w-full bg-surface hover:bg-surface-hover border-border"
             >
               <Edit3 className="w-4 h-4 mr-2" />
               Edit Profile
@@ -189,40 +177,45 @@ export default function DashboardSidebar({ activeTab, onTabChange = () => {}, on
       </Card>
 
       {/* Navigation */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">Navigation</CardTitle>
+      <Card className="glass-card border-0 overflow-hidden">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-medium text-foreground-muted uppercase tracking-wider">Navigation</CardTitle>
         </CardHeader>
-        <CardContent className="p-0">
+        <CardContent className="p-2">
           <nav className="space-y-1">
-            {[
-              { id: "feed", label: "News Feed", icon: "🏠" },
-              { id: "jobs", label: "Job Board", icon: "💼" },
-              { id: "events", label: "Events", icon: "📅" },
-              { id: "directory", label: "Alumni Directory", icon: "👥" },
-            ].map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleNavigation(item.id)}
-                className={`w-full flex items-center space-x-3 px-6 py-3 text-left transition-colors hover:scale-105 transition-transform duration-200 ${
-                  activeTab === item.id
-                    ? "bg-primary/10 text-primary border-r-2 border-primary"
-                    : "text-foreground-muted hover:text-foreground hover:bg-surface-hover"
-                }`}
-              >
-                <span className="text-lg">{item.icon}</span>
-                <span className="font-medium">{item.label}</span>
-              </button>
-            ))}
+            {navItems.map((item) => {
+              const Icon = item.icon
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => handleNavigation(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 group ${activeTab === item.id
+                      ? "bg-gradient-to-r from-primary/15 to-accent-blue/10 text-primary"
+                      : "text-foreground-muted hover:text-foreground hover:bg-surface"
+                    }`}
+                >
+                  <Icon className={`w-5 h-5 ${activeTab === item.id ? 'text-primary' : 'text-foreground-muted group-hover:text-foreground'}`} />
+                  <span className="font-medium">{item.label}</span>
+                  {activeTab === item.id && (
+                    <div className="ml-auto w-1.5 h-1.5 rounded-full bg-primary" />
+                  )}
+                </button>
+              )
+            })}
           </nav>
         </CardContent>
       </Card>
 
       {/* Logout */}
-      <Card>
-        <CardContent className="p-4">
-          <Button variant="outline" className="w-full bg-transparent">
-            <a href="/">Logout</a>
+      <Card className="glass-card border-0">
+        <CardContent className="p-3">
+          <Button
+            variant="ghost"
+            className="w-full justify-start text-foreground-muted hover:text-destructive hover:bg-destructive/10"
+            onClick={() => router.push('/')}
+          >
+            <LogOut className="w-5 h-5 mr-3" />
+            Logout
           </Button>
         </CardContent>
       </Card>

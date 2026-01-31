@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 /**
  * Supabase Storage Controller
  * Handles file uploads to Supabase Storage buckets
@@ -61,7 +62,7 @@ const uploadAvatar = catchAsync(async (req, res, next) => {
       try {
         await supabaseHelpers.storage.deleteFile('avatars', existingUser.avatar_path);
       } catch (deleteError) {
-        console.log('Could not delete existing avatar:', deleteError.message);
+        logger.debug('Could not delete existing avatar:', deleteError.message);
       }
     }
 
@@ -87,7 +88,7 @@ const uploadAvatar = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Avatar upload error:', error);
+    logger.error('Avatar upload error:', error);
     return next(new AppError('Failed to upload avatar', 500));
   }
 });
@@ -114,7 +115,7 @@ const uploadResume = catchAsync(async (req, res, next) => {
       try {
         await supabaseHelpers.storage.deleteFile('resumes', existingUser.resume_path);
       } catch (deleteError) {
-        console.log('Could not delete existing resume:', deleteError.message);
+        logger.debug('Could not delete existing resume:', deleteError.message);
       }
     }
 
@@ -136,7 +137,7 @@ const uploadResume = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Resume upload error:', error);
+    logger.error('Resume upload error:', error);
     return next(new AppError('Failed to upload resume', 500));
   }
 });
@@ -171,7 +172,7 @@ const getResumeUrl = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Resume URL generation error:', error);
+    logger.error('Resume URL generation error:', error);
     return next(new AppError('Failed to generate download URL', 500));
   }
 });
@@ -203,7 +204,7 @@ const deleteAvatar = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Avatar deletion error:', error);
+    logger.error('Avatar deletion error:', error);
     return next(new AppError('Failed to delete avatar', 500));
   }
 });
@@ -235,7 +236,7 @@ const deleteResume = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Resume deletion error:', error);
+    logger.error('Resume deletion error:', error);
     return next(new AppError('Failed to delete resume', 500));
   }
 });

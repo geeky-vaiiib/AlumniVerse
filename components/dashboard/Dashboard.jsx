@@ -6,7 +6,7 @@ import MainFeed from "./MainFeed"
 
 export default function Dashboard() {
   const [posts, setPosts] = useState([])
-  
+
   // ✅ Confirmation log that dashboard mounted successfully
   useEffect(() => {
     console.log("[DASHBOARD] ✅ Dashboard mounted successfully, user session stable")
@@ -17,12 +17,12 @@ export default function Dashboard() {
   }
 
   return (
-    <DashboardLayout 
-      title="News Feed" 
+    <DashboardLayout
+      title="News Feed"
       subtitle="Stay updated with the latest news from your alumni network"
       activeTab="feed"
     >
-      <MainFeed userPosts={posts} />
+      <MainFeed userPosts={posts} activeTab="feed" />
     </DashboardLayout>
   )
 }

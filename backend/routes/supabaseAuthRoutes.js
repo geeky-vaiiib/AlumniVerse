@@ -26,35 +26,123 @@ const {
 const router = express.Router();
 
 /**
- * @route   POST /api/auth/signup
- * @desc    Register new user with SIT email
- * @access  Public
+ * @swagger
+ * /auth/signup:
+ *   post:
+ *     summary: Register new user with SIT email
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - firstName
+ *               - lastName
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: 1si23cs117@sit.ac.in
+ *               firstName:
+ *                 type: string
+ *                 example: John
+ *               lastName:
+ *                 type: string
+ *                 example: Doe
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Success'
+ *       400:
+ *         description: Invalid SIT email
+ *       409:
+ *         description: Email already registered
  */
 router.post('/signup',
-  signupRateLimit, // 3 attempts per 5 minutes
+  signupRateLimit,
   validateSITEmail,
   signupValidation,
   signup
 );
 
 /**
- * @route   POST /api/auth/signin
- * @desc    Sign in user
- * @access  Public
+ * @swagger
+ * /auth/signin:
+ *   post:
+ *     summary: Sign in existing user
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *                 example: 1si23cs117@sit.ac.in
+ *     responses:
+ *       200:
+ *         description: OTP sent successfully
+ *       404:
+ *         description: User not found
  */
 router.post('/signin',
-  signinRateLimit, // 10 attempts per 15 minutes
+  signinRateLimit,
   signinValidation,
   signin
 );
 
 /**
- * @route   POST /api/auth/verify-otp
- * @desc    Verify OTP for email verification
- * @access  Public
+ * @swagger
+ * /auth/verify-otp:
+ *   post:
+ *     summary: Verify OTP for authentication
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - email
+ *               - token
+ *             properties:
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               token:
+ *                 type: string
+ *                 minLength: 6
+ *                 maxLength: 6
+ *                 example: "123456"
+ *     responses:
+ *       200:
+ *         description: OTP verified, session created
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 session:
+ *                   type: object
+ *       400:
+ *         description: Invalid or expired OTP
  */
 router.post('/verify-otp',
-  otpRateLimit, // 5 attempts per 10 minutes
+  otpRateLimit,
   verifyOTPValidation,
   verifyOTP
 );

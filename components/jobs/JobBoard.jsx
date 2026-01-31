@@ -7,12 +7,67 @@ import { Badge } from "../ui/badge"
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar"
 import JobPostModal from "./JobPostModal"
 import { getInitials } from "../../lib/utils"
-import { useJobsRealtime } from "../../hooks/useSupabaseRealtime"
-import apiService from "../../lib/api"
-import { getSupabaseClient } from "../../lib/supabase-singleton"
 import { Briefcase, MapPin, Clock, DollarSign, Bookmark, ExternalLink } from "lucide-react"
 
-const supabase = getSupabaseClient()
+// Demo jobs data
+const DEMO_JOBS = [
+  {
+    id: '1',
+    title: 'Senior Software Engineer',
+    company: 'Google India',
+    location: 'Bangalore, India',
+    type: 'Full-time',
+    experience: '3-5 years',
+    salary: '₹25L - ₹45L',
+    description: 'Join our team to build next-generation cloud infrastructure. Work with cutting-edge technologies and scale products to billions of users.',
+    skills: ['Python', 'Go', 'Kubernetes', 'GCP'],
+    postedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+    applicants: 45,
+    postedBy: { name: 'Priya Sharma', batch: '2019', avatar: null }
+  },
+  {
+    id: '2',
+    title: 'Product Manager',
+    company: 'Microsoft',
+    location: 'Hyderabad, India (Hybrid)',
+    type: 'Full-time',
+    experience: '2-4 years',
+    salary: '₹20L - ₹35L',
+    description: 'Drive product strategy for Azure cloud services. Work closely with engineering teams to deliver customer value.',
+    skills: ['Product Strategy', 'Agile', 'Data Analysis', 'SQL'],
+    postedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+    applicants: 32,
+    postedBy: { name: 'Rahul Kumar', batch: '2018', avatar: null }
+  },
+  {
+    id: '3',
+    title: 'Data Science Intern',
+    company: 'Amazon',
+    location: 'Remote',
+    type: 'Internship',
+    experience: 'Entry Level',
+    salary: '₹50K/month',
+    description: 'Summer internship opportunity for passionate data science students. Learn from the best and work on real-world ML problems.',
+    skills: ['Python', 'ML', 'Pandas', 'TensorFlow'],
+    postedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+    applicants: 78,
+    postedBy: { name: 'Vikram Patil', batch: '2020', avatar: null }
+  },
+  {
+    id: '4',
+    title: 'Full Stack Developer',
+    company: 'TechStartup.io',
+    location: 'Bangalore, India',
+    type: 'Full-time',
+    experience: '1-3 years',
+    salary: '₹12L - ₹20L',
+    description: 'Join an exciting early-stage startup! Work on building our MVP with React and Node.js. Equity included.',
+    skills: ['React', 'Node.js', 'MongoDB', 'AWS'],
+    postedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+    applicants: 23,
+    postedBy: { name: 'Aishwarya Hegde', batch: '2018', avatar: null }
+  }
+]
 
 const JobBoard = () => {
   const [jobs, setJobs] = useState([])
@@ -22,71 +77,84 @@ const JobBoard = () => {
   const [savedJobs, setSavedJobs] = useState([])
   const [activeFilter, setActiveFilter] = useState("all") // all, saved
 
-  // 🔄 Fetch jobs from API
-  const fetchJobs = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const response = await apiService.jobs.getAll()
-      
-      if (response.success && response.data) {
-        setJobs(response.data.jobs || [])
-        console.log('✅ [JOBS] Loaded', response.data.jobs?.length || 0, 'jobs')
-      }
-    } catch (err) {
-      console.error('❌ [JOBS] Error fetching jobs:', err)
-      setError(err.message || 'Failed to load jobs')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  // Initial load
+  // 🔄 Initialize with Firestore data + Demo data
   useEffect(() => {
-    fetchJobs()
-  }, [fetchJobs])
+    const fetchJobs = async () => {
+      try {
+        setLoading(true)
 
-  // 🔄 Real-time updates for jobs
-  const handleRealtimeUpdate = useCallback((payload) => {
-    console.log('🔄 [JOBS] Real-time update:', payload.eventType)
-    
-    if (payload.eventType === 'INSERT') {
-      setJobs(prev => [payload.new, ...prev])
-    } else if (payload.eventType === 'UPDATE') {
-      setJobs(prev => prev.map(job => 
-        job.id === payload.new.id ? payload.new : job
-      ))
-    } else if (payload.eventType === 'DELETE') {
-      setJobs(prev => prev.filter(job => job.id !== payload.old.id))
+        // Dynamic import for Firestore
+        const { collection, getDocs, query, orderBy, limit } = await import('firebase/firestore')
+        const { db } = await import('../../lib/firebase')
+
+        const jobsRef = collection(db, 'jobs')
+        const q = query(jobsRef, orderBy('postedDate', 'desc'), limit(20))
+        const snapshot = await getDocs(q)
+
+        const firestoreJobs = snapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }))
+
+        console.log('✅ [JOBS] Loaded', firestoreJobs.length, 'jobs from Firestore')
+        setJobs([...firestoreJobs, ...DEMO_JOBS])
+      } catch (error) {
+        console.error('❌ [JOBS] Error loading from Firestore:', error)
+        // Fallback to demo data
+        setJobs(DEMO_JOBS)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [])
 
-  // Subscribe to real-time updates
-  useJobsRealtime(handleRealtimeUpdate)
+    fetchJobs()
+  }, [])
 
   const handleSaveJob = (jobId) => {
-    setSavedJobs((prev) => 
+    setSavedJobs((prev) =>
       prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]
     )
   }
 
   const handleJobPost = async (jobData) => {
     try {
-      console.log('🔄 [JOBS] Posting job:', jobData)
-      const response = await apiService.jobs.create(jobData)
-      
-      if (response.success) {
-        console.log('✅ [JOBS] Job posted successfully')
-        setShowPostModal(false)
-        await fetchJobs() // Refresh jobs list
+      console.log('🔄 [JOBS] Posting job to Firestore:', jobData)
+
+      // Dynamic import
+      const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
+      const { db } = await import('../../lib/firebase')
+      const { auth } = await import('../../lib/firebase') // To get current user
+
+      const user = auth.currentUser
+
+      const newJob = {
+        ...jobData,
+        postedDate: new Date().toISOString(),
+        createdAt: serverTimestamp(),
+        applicants: 0,
+        authorId: user?.uid,
+        postedBy: {
+          name: user?.displayName || 'Alumni Member',
+          batch: '2024', // Ideally fetch from profile
+          avatar: user?.photoURL || null
+        }
       }
+
+      const docRef = await addDoc(collection(db, 'jobs'), newJob)
+
+      // Optimistic update
+      const jobWithId = { ...newJob, id: docRef.id }
+      setJobs(prev => [jobWithId, ...prev])
+      setShowPostModal(false)
+      console.log('✅ [JOBS] Job posted successfully:', docRef.id)
+
     } catch (err) {
       console.error('❌ [JOBS] Error posting job:', err)
-      alert('Failed to post job. Please try again.')
+      alert('Failed to post job: ' + err.message)
     }
   }
 
-  const filteredJobs = activeFilter === "saved" 
+  const filteredJobs = activeFilter === "saved"
     ? jobs.filter((job) => savedJobs.includes(job.id))
     : jobs
 
@@ -117,33 +185,6 @@ const JobBoard = () => {
     )
   }
 
-  // ❌ Error state
-  if (error) {
-    return (
-      <div className="space-y-6">
-        <div className="mb-4">
-          <Button onClick={() => setShowPostModal(true)} className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">
-            <Briefcase className="w-4 h-4 mr-2" />
-            Post a Job
-          </Button>
-        </div>
-        <Card className="bg-[#2D2D2D] border-[#3D3D3D]">
-          <CardContent className="p-12 text-center">
-            <div className="w-24 h-24 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-4xl">⚠️</span>
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Failed to Load Jobs</h3>
-            <p className="text-[#B0B0B0] mb-4">{error}</p>
-            <Button onClick={fetchJobs} className="bg-[#4A90E2] hover:bg-[#357ABD] text-white">Try Again</Button>
-          </CardContent>
-        </Card>
-        {showPostModal && (
-          <JobPostModal onClose={() => setShowPostModal(false)} onSubmit={handleJobPost} />
-        )}
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       {/* Header Actions */}
@@ -151,21 +192,19 @@ const JobBoard = () => {
         <div className="flex space-x-4">
           <button
             onClick={() => setActiveFilter("all")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeFilter === "all"
-                ? "bg-[#4A90E2] text-white"
-                : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
-            }`}
+            className={`px-4 py-2 rounded-lg transition-colors ${activeFilter === "all"
+              ? "bg-[#4A90E2] text-white"
+              : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
+              }`}
           >
             All Jobs ({jobs.length})
           </button>
           <button
             onClick={() => setActiveFilter("saved")}
-            className={`px-4 py-2 rounded-lg transition-colors ${
-              activeFilter === "saved"
-                ? "bg-[#4A90E2] text-white"
-                : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
-            }`}
+            className={`px-4 py-2 rounded-lg transition-colors ${activeFilter === "saved"
+              ? "bg-[#4A90E2] text-white"
+              : "bg-[#3D3D3D] text-[#B0B0B0] hover:bg-[#4D4D4D]"
+              }`}
           >
             Saved Jobs ({savedJobs.length})
           </button>
@@ -280,7 +319,7 @@ const JobBoard = () => {
                 {activeFilter === "saved" ? "No Saved Jobs" : "No Jobs Posted Yet"}
               </h3>
               <p className="text-[#B0B0B0] mb-4">
-                {activeFilter === "saved" 
+                {activeFilter === "saved"
                   ? "Save jobs you're interested in to view them here."
                   : "Be the first to post a job opportunity for the AlumniVerse community!"
                 }

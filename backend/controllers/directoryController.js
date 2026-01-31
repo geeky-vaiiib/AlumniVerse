@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const { query, validationResult } = require('express-validator');
 const { supabase } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
@@ -97,7 +98,7 @@ const getAlumniDirectory = catchAsync(async (req, res, next) => {
     const { data: alumni, error, count: totalCount } = await dbQuery;
 
     if (error) {
-      console.error('Supabase alumni query error:', error);
+      logger.error('Supabase alumni query error:', error);
       return next(new AppError('Failed to fetch alumni directory', 500));
     }
 
@@ -143,7 +144,7 @@ const getAlumniDirectory = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Alumni directory fetch error:', error);
+    logger.error('Alumni directory fetch error:', error);
     return next(new AppError('Failed to fetch alumni directory', 500));
   }
 });
@@ -172,7 +173,7 @@ const getAlumniById = catchAsync(async (req, res, next) => {
       if (error.code === 'PGRST116') {
         return next(new AppError('Alumni not found', 404));
       }
-      console.error('Supabase alumni fetch error:', error);
+      logger.error('Supabase alumni fetch error:', error);
       return next(new AppError('Failed to fetch alumni details', 500));
     }
 
@@ -198,7 +199,7 @@ const getAlumniById = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Alumni details fetch error:', error);
+    logger.error('Alumni details fetch error:', error);
     return next(new AppError('Failed to fetch alumni details', 500));
   }
 });
@@ -268,7 +269,7 @@ const getAlumniStats = catchAsync(async (req, res, next) => {
       .eq('is_email_verified', true);
 
     if (totalError) {
-      console.error('Total alumni count error:', totalError);
+      logger.error('Total alumni count error:', totalError);
     }
 
     // Get stats by branch
@@ -301,7 +302,7 @@ const getAlumniStats = catchAsync(async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('Alumni stats fetch error:', error);
+    logger.error('Alumni stats fetch error:', error);
     return next(new AppError('Failed to fetch alumni statistics', 500));
   }
 });
@@ -325,7 +326,7 @@ const getFeaturedAlumni = catchAsync(async (req, res, next) => {
       .limit(parseInt(limit));
 
     if (error) {
-      console.error('Featured alumni fetch error:', error);
+      logger.error('Featured alumni fetch error:', error);
       return next(new AppError('Failed to fetch featured alumni', 500));
     }
 
@@ -341,7 +342,7 @@ const getFeaturedAlumni = catchAsync(async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('Featured alumni fetch error:', error);
+    logger.error('Featured alumni fetch error:', error);
     return next(new AppError('Failed to fetch featured alumni', 500));
   }
 });

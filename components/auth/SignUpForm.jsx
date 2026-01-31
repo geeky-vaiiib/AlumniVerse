@@ -9,7 +9,7 @@ import { useAuth } from "../providers/AuthProvider"
 import { parseInstitutionalEmail } from "../../lib/utils/emailParser"
 
 export default function SignUpForm({ onStepChange }) {
-  const { signUpWithOTP, signUpWithPassword, isReady, error: authError } = useAuth()
+  const { signUpWithOTP, signUpWithPassword, loading: authLoading, error: authError } = useAuth()
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -149,20 +149,20 @@ export default function SignUpForm({ onStepChange }) {
       // STEP 1: Check if user already exists before sending OTP
       console.log('🔍 [TEMP] Checking if user exists before OTP send:', formData.email)
       setUserExistsCheck('checking')
-      
+
       const existsResponse = await fetch(`/api/user/exists?email=${encodeURIComponent(formData.email.trim().toLowerCase())}`)
       const existsData = await existsResponse.json()
-      
+
       if (existsData.exists) {
         setUserExistsCheck('exists')
-        setErrors({ 
+        setErrors({
           email: "An account already exists for this email.",
           submit: "Please use 'Login with OTP' or 'Login with Password' instead of signing up."
         })
         setIsLoading(false)
         return
       }
-      
+
       setUserExistsCheck('not-exists')
       console.log('✅ [TEMP] User does not exist, proceeding with signup')
 
@@ -179,12 +179,6 @@ export default function SignUpForm({ onStepChange }) {
 
       console.log('Sending OTP with metadata:', metadata)
 
-      // Check if auth service is ready
-      if (!isReady) {
-        setErrors({ submit: "Authentication service is not available. Please try again." })
-        return
-      }
-
       // Sign up with password
       const { data, error } = await signUpWithPassword(
         formData.email.trim().toLowerCase(),
@@ -194,7 +188,7 @@ export default function SignUpForm({ onStepChange }) {
 
       if (error) {
         console.error('Signup error:', error)
-        
+
         if (error.message?.includes('already registered') || error.message?.includes('User already registered')) {
           setErrors({ email: "This email is already registered. Please use the 'Sign In' option instead." })
         } else if (error.status === 429 || /rate limit|Too Many Requests/i.test(error.message || '')) {
@@ -207,7 +201,7 @@ export default function SignUpForm({ onStepChange }) {
       }
 
       console.log('Account created successfully, sending OTP...')
-      
+
       // Also send OTP for email verification
       await signUpWithOTP(formData.email.trim().toLowerCase(), metadata)
 

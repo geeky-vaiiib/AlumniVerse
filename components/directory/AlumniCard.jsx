@@ -1,13 +1,15 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent } from "../ui/card"
 import { Button } from "../ui/button"
 import { generateAvatar } from "../../lib/utils"
 
 export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
+  const router = useRouter()
   const [isConnecting, setIsConnecting] = useState(false)
-  
+
   // Transform API data to component format
   const transformedAlumni = {
     id: alumni.id,
@@ -25,7 +27,7 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
     avatar: alumni.avatar || null,
     profilePictureUrl: alumni.profilePictureUrl || alumni.profile_picture_url
   }
-  
+
   const avatar = generateAvatar(transformedAlumni.name)
 
   const handleConnect = async () => {
@@ -41,8 +43,7 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
 
   const handleViewProfile = () => {
     // Navigate to detailed profile view
-    console.log("View profile:", transformedAlumni.id)
-    // TODO: Implement navigation to profile page
+    router.push(`/profile/${transformedAlumni.id}`)
   }
 
   return (
@@ -58,8 +59,8 @@ export default function AlumniCard({ alumni, onConnect, animationDelay = 0 }) {
             style={{ backgroundColor: avatar.backgroundColor }}
           >
             {transformedAlumni.profilePictureUrl ? (
-              <img 
-                src={transformedAlumni.profilePictureUrl} 
+              <img
+                src={transformedAlumni.profilePictureUrl}
                 alt={transformedAlumni.name}
                 className="w-full h-full object-cover"
               />

@@ -16,15 +16,62 @@ function EventsSection() {
   const [events, setEvents] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Demo events data
+  const demoEvents = [
+    {
+      id: '1',
+      title: 'Annual Alumni Reunion 2024',
+      date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      location: 'SIT Main Auditorium, Tumkur',
+      isVirtual: false,
+      category: 'reunion',
+      description: 'Join us for the biggest alumni gathering of the year! Meet old friends, network with successful alumni, and celebrate our shared legacy.',
+      attendeesCount: 156,
+      maxAttendees: 500,
+      organizer: { name: 'Alumni Association' }
+    },
+    {
+      id: '2',
+      title: 'Tech Career Workshop - AI & ML',
+      date: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      location: 'Online via Zoom',
+      isVirtual: true,
+      category: 'workshop',
+      description: 'Learn about the latest trends in AI/ML careers from Google and Microsoft engineers. Interactive Q&A session included.',
+      attendeesCount: 89,
+      maxAttendees: 200,
+      organizer: { name: 'Career Development Cell' }
+    },
+    {
+      id: '3',
+      title: 'Startup Networking Night',
+      date: new Date(Date.now() + 21 * 24 * 60 * 60 * 1000).toISOString(),
+      location: 'Bangalore Tech Hub',
+      isVirtual: false,
+      category: 'networking',
+      description: 'Connect with fellow alumni entrepreneurs, investors, and startup enthusiasts. Pitch your ideas and find potential co-founders!',
+      attendeesCount: 45,
+      maxAttendees: 100,
+      organizer: { name: 'Entrepreneurship Cell' }
+    }
+  ]
+
   useEffect(() => {
     loadEvents()
   }, [])
 
   const loadEvents = async () => {
     setLoading(true)
-    const { data, error } = await fetchEvents({ limit: 20 })
-    if (!error && data) {
-      setEvents(data)
+    try {
+      const { data, error } = await fetchEvents({ limit: 20 })
+      if (!error && data && data.length > 0) {
+        setEvents(data)
+      } else {
+        setEvents(demoEvents)
+      }
+    } catch (error) {
+      console.log('Using demo events data')
+      setEvents(demoEvents)
     }
     setLoading(false)
   }
@@ -62,8 +109,8 @@ function EventsSection() {
               <div className="flex items-start space-x-4">
                 <div className="text-4xl">
                   {event.category === 'networking' ? '🌆' :
-                   event.category === 'workshop' ? '💼' :
-                   event.category === 'reunion' ? '🎉' : '📅'}
+                    event.category === 'workshop' ? '💼' :
+                      event.category === 'reunion' ? '🎉' : '📅'}
                 </div>
                 <div className="flex-1">
                   <div className="flex items-start justify-between">
@@ -89,12 +136,11 @@ function EventsSection() {
                       </div>
                       <p className="text-foreground-muted text-sm mb-4">{event.description}</p>
                       <div className="flex items-center space-x-4 text-sm">
-                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                          event.category === 'networking' ? 'bg-blue-100 text-blue-800' :
+                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${event.category === 'networking' ? 'bg-blue-100 text-blue-800' :
                           event.category === 'workshop' ? 'bg-green-100 text-green-800' :
-                          event.category === 'reunion' ? 'bg-purple-100 text-purple-800' :
-                          'bg-orange-100 text-orange-800'
-                        }`}>
+                            event.category === 'reunion' ? 'bg-purple-100 text-purple-800' :
+                              'bg-orange-100 text-orange-800'
+                          }`}>
                           {event.category}
                         </span>
                         <span className="text-foreground-muted">
@@ -142,15 +188,80 @@ function JobsSection() {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
 
+  // Demo jobs data
+  const demoJobs = [
+    {
+      id: '1',
+      title: 'Senior Software Engineer',
+      company: 'Google India',
+      location: 'Bangalore, India',
+      type: 'Full-time',
+      experienceLevel: '3-5 years',
+      salaryRange: '₹25L - ₹45L',
+      description: 'Join our team to build next-generation cloud infrastructure. Work with cutting-edge technologies and scale products to billions of users.',
+      requiredSkills: ['Python', 'Go', 'Kubernetes', 'GCP'],
+      postedDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+      deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString(),
+      postedBy: { name: 'Priya Sharma (2019 Batch)' }
+    },
+    {
+      id: '2',
+      title: 'Product Manager',
+      company: 'Microsoft',
+      location: 'Hyderabad, India (Hybrid)',
+      type: 'Full-time',
+      experienceLevel: '2-4 years',
+      salaryRange: '₹20L - ₹35L',
+      description: 'Drive product strategy for Azure cloud services. Work closely with engineering teams to deliver customer value.',
+      requiredSkills: ['Product Strategy', 'Agile', 'Data Analysis', 'SQL'],
+      postedDate: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+      postedBy: { name: 'Rahul Kumar (2018 Batch)' }
+    },
+    {
+      id: '3',
+      title: 'Data Science Intern',
+      company: 'Amazon',
+      location: 'Remote',
+      type: 'Internship',
+      experienceLevel: 'Entry Level',
+      salaryRange: '₹50K/month',
+      description: 'Summer internship opportunity for passionate data science students. Learn from the best and work on real-world ML problems.',
+      requiredSkills: ['Python', 'ML', 'Pandas', 'TensorFlow'],
+      postedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      postedBy: { name: 'Vikram Patil (2020 Batch)' }
+    },
+    {
+      id: '4',
+      title: 'Full Stack Developer',
+      company: 'TechStartup.io',
+      location: 'Bangalore, India',
+      type: 'Full-time',
+      experienceLevel: '1-3 years',
+      salaryRange: '₹12L - ₹20L',
+      description: 'Join an exciting early-stage startup! Work on building our MVP with React and Node.js. Equity included.',
+      requiredSkills: ['React', 'Node.js', 'MongoDB', 'AWS'],
+      postedDate: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+      postedBy: { name: 'Aishwarya Hegde (2018 Batch)' }
+    }
+  ]
+
   useEffect(() => {
     loadJobs()
   }, [])
 
   const loadJobs = async () => {
     setLoading(true)
-    const { data, error } = await fetchJobs({ limit: 20 })
-    if (!error && data) {
-      setJobs(data)
+    try {
+      const { data, error } = await fetchJobs({ limit: 20 })
+      if (!error && data && data.length > 0) {
+        setJobs(data)
+      } else {
+        setJobs(demoJobs)
+      }
+    } catch (error) {
+      console.log('Using demo jobs data')
+      setJobs(demoJobs)
     }
     setLoading(false)
   }
@@ -180,7 +291,7 @@ function JobsSection() {
         <h2 className="text-2xl font-bold text-foreground">Job Opportunities</h2>
         <Button size="sm" className="hover-glow">Post Job</Button>
       </div>
-      
+
       <div className="grid grid-cols-1 gap-6">
         {jobs.length > 0 ? (
           jobs.map((job) => (
@@ -286,7 +397,7 @@ export default function MainFeed({ activeTab, userPosts = [] }) {
   const [posts, setPosts] = useState([])
   const [loading, setLoading] = useState(true)
   const { userProfile } = useUser()
-  const { session } = useAuth()
+  const { user } = useAuth() // Firebase uses 'user' instead of 'session'
 
   useEffect(() => {
     if (activeTab === 'feed') {
@@ -294,56 +405,112 @@ export default function MainFeed({ activeTab, userPosts = [] }) {
     }
   }, [activeTab])
 
+  // Demo posts data
+  const DEMO_POSTS = [
+    {
+      id: '1',
+      author: {
+        name: 'Priya Sharma',
+        designation: 'Software Engineer',
+        company: 'Google',
+        batch: '2021',
+        avatar: null
+      },
+      content: '🎉 Exciting news! Just got promoted to Senior Software Engineer at Google! Thank you to all my SIT professors and batchmates who supported me throughout my journey. #SITAlumni #GoogleCareers #TechLife',
+      timestamp: '2 hours ago',
+      likes: 142,
+      comments: 28,
+      shares: 12,
+      isLiked: false
+    },
+    {
+      id: '2',
+      author: {
+        name: 'Rahul Kumar',
+        designation: 'Product Manager',
+        company: 'Microsoft',
+        batch: '2019',
+        avatar: null
+      },
+      content: 'Looking for passionate SIT juniors interested in UI/UX design! We have internship openings at Microsoft for summer 2024. DM me if interested! 🚀 #Internship #Microsoft #SITCareers',
+      timestamp: '5 hours ago',
+      likes: 89,
+      comments: 45,
+      shares: 32,
+      isLiked: true
+    },
+    {
+      id: '3',
+      author: {
+        name: 'Aishwarya Hegde',
+        designation: 'Founder & CEO',
+        company: 'TechStartup.io',
+        batch: '2018',
+        avatar: null
+      },
+      content: 'Proud moment! Our startup just raised $2M in seed funding! 💰 Special thanks to our investors and the SIT entrepreneurship cell for the early support. If you\'re an alumnus looking to work in an exciting startup, we\'re hiring! #StartupLife #Funding #SITStartup',
+      timestamp: 'Yesterday',
+      likes: 256,
+      comments: 67,
+      shares: 45,
+      isLiked: false
+    },
+    {
+      id: '4',
+      author: {
+        name: 'Vikram Patil',
+        designation: 'Data Scientist',
+        company: 'Amazon',
+        batch: '2020',
+        avatar: null
+      },
+      content: 'Just published my first research paper on Machine Learning! 📚 Thank you Dr. Kumar for your guidance. Check it out: "Efficient Deep Learning Models for Real-time Object Detection" #ML #Research #SITResearch',
+      timestamp: '2 days ago',
+      likes: 198,
+      comments: 34,
+      shares: 21,
+      isLiked: false
+    }
+  ]
+
   const loadPosts = async () => {
     setLoading(true)
     try {
-      const token = session?.access_token
-      const response = await apiService.posts.getAll({}, token)
-      
-      if (response.success && response.data.posts) {
-        setPosts(response.data.posts)
-      } else {
-        // Fallback to mock data if API fails
-        setPosts([
-          {
-            id: '1',
-            author: {
-              name: 'Sample Alumni',
-              designation: 'Software Engineer',
-              company: 'Tech Corp',
-              batch: '2023',
-              avatar: null
-            },
-            content: 'Welcome to AlumniVerse! This is a sample post to demonstrate the feed functionality.',
-            timestamp: 'Just now',
-            likes: 5,
-            comments: 2,
-            shares: 1,
-            isLiked: false
-          }
-        ])
-      }
-    } catch (error) {
-      console.error('Error loading posts:', error)
-      // Fallback to mock data
-      setPosts([
-        {
-          id: '1',
-          author: {
-            name: 'Sample Alumni',
-            designation: 'Software Engineer',
-            company: 'Tech Corp',
-            batch: '2023',
-            avatar: null
-          },
-          content: 'Welcome to AlumniVerse! This is a sample post to demonstrate the feed functionality.',
-          timestamp: 'Just now',
-          likes: 5,
-          comments: 2,
-          shares: 1,
-          isLiked: false
+      // Dynamic import for Firestore
+      const { collection, getDocs, query, orderBy, limit } = await import('firebase/firestore')
+      const { db } = await import('../../lib/firebase')
+
+      const postsRef = collection(db, 'posts')
+      const q = query(postsRef, orderBy('createdAt', 'desc'), limit(20))
+      const snapshot = await getDocs(q)
+
+      const firestorePosts = snapshot.docs.map(doc => {
+        const data = doc.data()
+        // Simple relative time formatter
+        let timeString = 'Just now'
+        if (data.createdAt) {
+          const date = data.createdAt.toDate ? data.createdAt.toDate() : new Date(data.createdAt)
+          const diff = (new Date() - date) / 1000 // seconds
+          if (diff < 60) timeString = 'Just now'
+          else if (diff < 3600) timeString = `${Math.floor(diff / 60)}m ago`
+          else if (diff < 86400) timeString = `${Math.floor(diff / 3600)}h ago`
+          else timeString = `${Math.floor(diff / 86400)}d ago`
         }
-      ])
+
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: timeString
+        }
+      })
+
+      console.log('✅ [FEED] Loaded', firestorePosts.length, 'posts from Firestore')
+      // Merge: Firestore posts first (newest), then Demo posts
+      setPosts([...firestorePosts, ...DEMO_POSTS])
+
+    } catch (error) {
+      console.error('❌ [FEED] Error loading posts from Firestore:', error)
+      setPosts(DEMO_POSTS)
     } finally {
       setLoading(false)
     }
@@ -351,66 +518,58 @@ export default function MainFeed({ activeTab, userPosts = [] }) {
 
   const handleNewPost = async (newPost) => {
     try {
-      // Add the new post to the feed immediately for better UX
-      const optimisticPost = {
-        id: Date.now().toString(),
-        author: {
-          name: userProfile?.firstName + ' ' + userProfile?.lastName || 'Current User',
-          designation: userProfile?.designation || 'Alumni',
-          company: userProfile?.currentCompany || 'Not specified',
-          batch: userProfile?.passingYear || 'Not specified',
-          avatar: userProfile?.avatarUrl
-        },
+      console.log('🔄 [FEED] Creating post in Firestore:', newPost)
+
+      const { collection, addDoc, serverTimestamp } = await import('firebase/firestore')
+      const { db } = await import('../../lib/firebase')
+
+      const postData = {
         content: newPost.content,
-        timestamp: 'Just now',
+        author: {
+          name: userProfile?.firstName + ' ' + userProfile?.lastName || user?.displayName || 'Alumni Member',
+          designation: userProfile?.designation || 'Alumni',
+          company: userProfile?.currentCompany || '',
+          batch: userProfile?.passingYear || '',
+          avatar: userProfile?.avatarUrl || user?.photoURL || null
+        },
         likes: 0,
         comments: 0,
         shares: 0,
-        isLiked: false
+        isLiked: false,
+        createdAt: serverTimestamp(),
+        authorId: user?.uid,
+        tags: newPost.tags || []
       }
-      
+
+      // Optimistic update
+      const optimisticPost = {
+        id: Date.now().toString(),
+        ...postData,
+        timestamp: 'Just now'
+      }
       setPosts(prevPosts => [optimisticPost, ...prevPosts])
-      
-      // Try to create via API in background
-      try {
-        const token = session?.access_token
-        await apiService.posts.create({
-          content: newPost.content,
-          post_type: newPost.post_type || 'general',
-          images: newPost.images || [],
-          tags: newPost.tags || []
-        }, token)
-      } catch (apiError) {
-        console.log('API creation failed, keeping optimistic update:', apiError)
-      }
+
+      // Save to Firestore
+      const docRef = await addDoc(collection(db, 'posts'), postData)
+      console.log('✅ [FEED] Post created successfully:', docRef.id)
+
     } catch (error) {
-      console.error('Error creating post:', error)
+      console.error('❌ [FEED] Error creating post:', error)
+      alert('Failed to create post. Please try again.')
     }
   }
 
   const handleLike = async (postId) => {
-    try {
-      // Optimistically update UI
-      setPosts(posts.map(post =>
-        post.id === postId
-          ? {
-              ...post,
-              isLiked: !post.isLiked,
-              likes: post.isLiked ? post.likes - 1 : post.likes + 1
-            }
-          : post
-      ))
-
-      // Try to call API
-      try {
-        const token = session?.access_token
-        await apiService.posts.toggleLike(postId, token)
-      } catch (apiError) {
-        console.log('API like failed, keeping optimistic update:', apiError)
-      }
-    } catch (error) {
-      console.error('Error toggling like:', error)
-    }
+    // Optimistic only for now (DB sync is complex for likes without subcollections)
+    setPosts(posts.map(post =>
+      post.id === postId
+        ? {
+          ...post,
+          isLiked: !post.isLiked,
+          likes: post.isLiked ? post.likes - 1 : post.likes + 1
+        }
+        : post
+    ))
   }
 
   // Render different content based on activeTab

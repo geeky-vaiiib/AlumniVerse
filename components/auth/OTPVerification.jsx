@@ -8,7 +8,7 @@ import { Input } from "../ui/input"
 import { Mail, ArrowLeft, CheckCircle } from "lucide-react"
 import { useAuth } from "../providers/AuthProvider"
 import { useToast } from "../../hooks/use-toast"
-import { supabase } from "../../lib/supabaseClient"
+import { auth } from "../../lib/firebase"
 
 export default function OTPVerification({
   email,
@@ -19,7 +19,7 @@ export default function OTPVerification({
   onStepChange
 }) {
   const router = useRouter()
-  const { verifyOTP, signUpWithOTP, signInWithOTP, isReady } = useAuth()
+  const { verifyOTP, signUpWithOTP, signInWithOTP } = useAuth()
   const { toast } = useToast()
   const [otp, setOtp] = useState(["", "", "", "", "", ""])
   const [isLoading, setIsLoading] = useState(false)
@@ -94,7 +94,7 @@ export default function OTPVerification({
 
   const handleVerifyOTP = async () => {
     const otpCode = otp.join('')
-    
+
     if (otpCode.length !== 6) {
       setError("Please enter the complete 6-digit code")
       return
@@ -112,16 +112,10 @@ export default function OTPVerification({
 
     try {
       console.log('🔐 [TEMP] OTPVerification: Starting verification', { email, isSignUp, hasUserData: !!userData })
-      console.log('Verifying OTP via Supabase:', { email })
-
-      // Check if auth service is ready
-      if (!isReady) {
-        setError("Authentication service is not available. Please try again.")
-        return
-      }
+      console.log('Verifying OTP via Firebase:', { email })
 
       // Use enhanced AuthProvider OTP verification with profile creation
-      const { data, error: authError } = await verifyOTP(email, otpCode, {
+      const result = await verifyOTP(email, otpCode, {
         first_name: firstName,
         last_name: lastName,
         usn: userData?.usn,
@@ -131,60 +125,52 @@ export default function OTPVerification({
         passing_year: userData?.passing_year
       })
 
-      console.log('🔐 [TEMP] OTPVerification: Verification result', { 
-        success: !authError && !!data, 
-        hasUser: !!(data?.user),
-        error: authError?.message 
+      console.log('🔐 [TEMP] OTPVerification: Verification result', {
+        success: result?.success,
+        hasUser: !!(result?.user),
+        error: result?.error
       })
 
-      if (!authError && data && data.user) {
+      if (result?.success && result?.user) {
         console.log('🔐 [TEMP] OTPVerification: OTP verification successful')
         setSuccess("✅ Email verified successfully!")
 
-        // Don't show toast here - let AuthFlow handle it
-        // This prevents toast from getting stuck
+        // Wait for Firebase auth state to stabilize
+        const waitForAuth = async () => {
+          console.log('🔐 [TEMP] OTPVerification: Waiting for auth state...')
 
-        // ENHANCED: Wait for session to be properly established
-        const waitForSession = async () => {
-          console.log('🔐 [TEMP] OTPVerification: Waiting for session establishment...')
-          
           for (let attempt = 0; attempt < 5; attempt++) {
-            try {
-              const { data: { session } } = await supabase.auth.getSession()
-              if (session) {
-                console.log('🔐 [TEMP] OTPVerification: Session established successfully')
-                return session
-              }
-              console.log(`🔐 [TEMP] OTPVerification: Session attempt ${attempt + 1}/5 - waiting...`)
-              await new Promise(resolve => setTimeout(resolve, 800)) // Wait 800ms between attempts
-            } catch (err) {
-              console.warn('🔐 [TEMP] OTPVerification: Session check error:', err)
+            const currentUser = auth.currentUser
+            if (currentUser) {
+              console.log('🔐 [TEMP] OTPVerification: Auth state confirmed')
+              return currentUser
             }
+            console.log(`🔐 [TEMP] OTPVerification: Auth attempt ${attempt + 1}/5 - waiting...`)
+            await new Promise(resolve => setTimeout(resolve, 800))
           }
-          
-          console.warn('🔐 [TEMP] OTPVerification: Session not established after retries')
+
+          console.warn('🔐 [TEMP] OTPVerification: Auth state not confirmed after retries')
           return null
         }
 
         try {
-          const session = await waitForSession()
-          
-          // 🔧 CRITICAL: Sync session to server IMMEDIATELY before any navigation
-          if (session) {
-            console.log('🔐 [TEMP] OTPVerification: Syncing session to server before redirect...')
+          const currentUser = await waitForAuth()
+
+          // Sync session to server if needed
+          if (currentUser) {
+            console.log('🔐 [TEMP] OTPVerification: Syncing session to server...')
             try {
+              const idToken = await currentUser.getIdToken()
               const syncResponse = await fetch('/api/auth/session', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                  access_token: session.access_token,
-                  refresh_token: session.refresh_token
+                  access_token: idToken
                 })
               })
-              
+
               if (syncResponse.ok) {
                 console.log('🔐 [TEMP] OTPVerification: ✅ Session synced successfully')
-                // Wait for cookies to propagate
                 await new Promise(resolve => setTimeout(resolve, 500))
               } else {
                 console.error('🔐 [TEMP] OTPVerification: ❌ Session sync failed')
@@ -193,7 +179,7 @@ export default function OTPVerification({
               console.error('🔐 [TEMP] OTPVerification: ❌ Session sync error:', syncError)
             }
           }
-          
+
           // Clear any pending session storage
           sessionStorage.removeItem('pendingVerificationEmail')
           sessionStorage.removeItem('pendingFirstName')
@@ -202,17 +188,17 @@ export default function OTPVerification({
           sessionStorage.removeItem('pendingBranch')
           sessionStorage.removeItem('pendingJoiningYear')
           sessionStorage.removeItem('pendingPassingYear')
-          
-          console.log('🔐 [TEMP] OTPVerification: Initiating next step', { isSignUp, hasSession: !!session })
-          
+
+          console.log('🔐 [TEMP] OTPVerification: Initiating next step', { isSignUp })
+
           // Dismiss all toasts before step change
           if (toast?.dismiss) {
             toast.dismiss()
           }
-          
+
           // Small delay to ensure toast is dismissed
           await new Promise(resolve => setTimeout(resolve, 100))
-          
+
           // FIXED: Let AuthFlow handle all redirects - just change step here
           if (isSignUp) {
             // For new signups, go to profile creation
@@ -239,7 +225,7 @@ export default function OTPVerification({
       console.error('OTP verification error:', error)
       setVerifyAttempts(prev => prev + 1)
       setError("Verification failed. Please try again.")
-      
+
       // Clear OTP inputs on error
       setOtp(["", "", "", "", "", ""])
       inputRefs.current[0]?.focus()
@@ -278,7 +264,7 @@ export default function OTPVerification({
         setTimeout(() => setSuccess(""), 3000)
       } else {
         console.error('🔄 [TEMP] OTPVerification: Resend failed:', error)
-        
+
         // Handle specific rate limit error (429 / 12 second rule)
         if (error?.status === 429 || error?.message?.includes('security purposes') || error?.message?.includes('12 seconds')) {
           setError("For security purposes, you can only request this after 12 seconds.")
@@ -290,7 +276,7 @@ export default function OTPVerification({
       }
     } catch (error) {
       console.error('Resend OTP error:', error)
-      
+
       // Check if it's a rate limit error
       if (error?.message?.includes('security purposes') || error?.message?.includes('12 seconds')) {
         setError("For security purposes, you can only request this after 12 seconds.")

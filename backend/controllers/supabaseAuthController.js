@@ -6,6 +6,7 @@
 const { body, validationResult } = require('express-validator');
 const { supabase, supabaseAdmin } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
+const logger = require('../utils/logger');
 
 /**
  * Parse USN from SIT email to extract student information
@@ -145,7 +146,7 @@ const signup = catchAsync(async (req, res, next) => {
       passing_year: usnData.passingYear
     };
 
-    console.log('Sending OTP via Supabase Auth for:', email);
+    logger.info(`Sending OTP via Supabase Auth for: ${email}`);
 
     // Send OTP using Supabase Auth
     const { data, error } = await supabase.auth.signInWithOtp({
@@ -157,7 +158,7 @@ const signup = catchAsync(async (req, res, next) => {
     });
 
     if (error) {
-      console.error('Supabase signup error:', error);
+      logger.error('Supabase signup error:', error);
 
       if (error.message?.includes('already registered')) {
         return next(new AppError('Email already registered. Please sign in instead.', 409));
@@ -166,7 +167,7 @@ const signup = catchAsync(async (req, res, next) => {
       return next(new AppError(error.message || 'Failed to send verification code', 400));
     }
 
-    console.log('OTP sent successfully via Supabase:', data);
+    logger.debug('OTP sent successfully via Supabase');
 
     res.status(200).json({
       success: true,
@@ -178,7 +179,7 @@ const signup = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Signup error:', error);
+    logger.error('Signup error:', error);
     return next(new AppError(error.message || 'Signup failed', 500));
   }
 });
@@ -196,7 +197,7 @@ const signin = catchAsync(async (req, res, next) => {
   const { email } = req.body;
 
   try {
-    console.log('Sending login OTP via Supabase Auth for:', email);
+    logger.info(`Sending login OTP via Supabase Auth for: ${email}`);
 
     // Send OTP using Supabase Auth
     const { data, error } = await supabase.auth.signInWithOtp({
@@ -207,7 +208,7 @@ const signin = catchAsync(async (req, res, next) => {
     });
 
     if (error) {
-      console.error('Supabase signin error:', error);
+      logger.error('Supabase signin error:', error);
 
       if (error.message?.includes('not found') || error.message?.includes('invalid')) {
         return next(new AppError('No account found with this email. Please sign up first.', 404));
@@ -216,7 +217,7 @@ const signin = catchAsync(async (req, res, next) => {
       return next(new AppError(error.message || 'Failed to send verification code', 400));
     }
 
-    console.log('Login OTP sent successfully via Supabase:', data);
+    logger.debug('Login OTP sent successfully via Supabase');
 
     res.status(200).json({
       success: true,
@@ -228,7 +229,7 @@ const signin = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Signin error:', error);
+    logger.error('Signin error:', error);
     return next(new AppError(error.message || 'Signin failed', 500));
   }
 });
@@ -246,7 +247,7 @@ const verifyOTP = catchAsync(async (req, res, next) => {
   const { email, token } = req.body;
 
   try {
-    console.log('Verifying OTP via Supabase Auth for:', email);
+    logger.info(`Verifying OTP via Supabase Auth for: ${email}`);
 
     // Verify OTP using Supabase Auth
     const { data, error } = await supabase.auth.verifyOtp({
@@ -256,7 +257,7 @@ const verifyOTP = catchAsync(async (req, res, next) => {
     });
 
     if (error) {
-      console.error('Supabase OTP verification error:', error);
+      logger.error('Supabase OTP verification error:', error);
 
       if (error.message?.includes('expired')) {
         return next(new AppError('Verification code has expired. Please request a new one.', 400));
@@ -267,7 +268,7 @@ const verifyOTP = catchAsync(async (req, res, next) => {
       return next(new AppError(error.message || 'Verification failed', 400));
     }
 
-    console.log('OTP verified successfully via Supabase:', data.user?.email);
+    logger.info(`OTP verified successfully for: ${data.user?.email}`);
 
     res.status(200).json({
       success: true,
@@ -279,7 +280,7 @@ const verifyOTP = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('OTP verification error:', error);
+    logger.error('OTP verification error:', error);
     return next(new AppError(error.message || 'Verification failed', 500));
   }
 });

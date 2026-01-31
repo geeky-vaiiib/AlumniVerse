@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const { body, validationResult } = require('express-validator');
 const { supabaseHelpers } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
@@ -144,7 +145,7 @@ const uploadFiles = catchAsync(async (req, res, next) => {
       try {
         await deleteFile(user.profile_picture);
       } catch (error) {
-        console.error('Error deleting old profile picture:', error);
+        logger.error('Error deleting old profile picture:', error);
       }
     }
     
@@ -166,7 +167,7 @@ const uploadFiles = catchAsync(async (req, res, next) => {
       try {
         await deleteFile(user.resume);
       } catch (error) {
-        console.error('Error deleting old resume:', error);
+        logger.error('Error deleting old resume:', error);
       }
     }
 
@@ -190,7 +191,7 @@ const uploadFiles = catchAsync(async (req, res, next) => {
       try {
         await deleteFile(oldFilePath);
       } catch (error) {
-        console.error(`Error deleting old ${fieldName}:`, error);
+        logger.error(`Error deleting old ${fieldName}:`, error);
       }
     }
 
@@ -263,7 +264,7 @@ const deleteUser = catchAsync(async (req, res, next) => {
     try {
       await deleteFile(user.profile_picture);
     } catch (error) {
-      console.error('Error deleting profile picture:', error);
+      logger.error('Error deleting profile picture:', error);
     }
   }
 
@@ -271,7 +272,7 @@ const deleteUser = catchAsync(async (req, res, next) => {
     try {
       await deleteFile(user.resume);
     } catch (error) {
-      console.error('Error deleting resume:', error);
+      logger.error('Error deleting resume:', error);
     }
   }
 

@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const { body, query, validationResult } = require('express-validator');
 const { supabase, supabaseAdmin, supabaseHelpers } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
@@ -32,7 +33,7 @@ const getUserBadges = catchAsync(async (req, res, next) => {
       if (userError.code === 'PGRST116') {
         return next(new AppError('User not found', 404));
       }
-      console.error('User fetch error:', userError);
+      logger.error('User fetch error:', userError);
       return next(new AppError('Failed to fetch user', 500));
     }
 
@@ -44,7 +45,7 @@ const getUserBadges = catchAsync(async (req, res, next) => {
       .order('earned_at', { ascending: false });
 
     if (badgesError) {
-      console.error('Badges fetch error:', badgesError);
+      logger.error('Badges fetch error:', badgesError);
       return next(new AppError('Failed to fetch badges', 500));
     }
 
@@ -78,7 +79,7 @@ const getUserBadges = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('User badges fetch error:', error);
+    logger.error('User badges fetch error:', error);
     return next(new AppError('Failed to fetch user badges', 500));
   }
 });

@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const { body, validationResult } = require('express-validator');
 const { supabase } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
@@ -43,7 +44,7 @@ const getPosts = catchAsync(async (req, res, next) => {
   const { data: posts, error, count } = await query;
 
   if (error) {
-    console.error('Supabase error fetching posts:', error);
+    logger.error('Supabase error fetching posts:', error);
     return next(new AppError(`Failed to fetch posts: ${error.message}`, 500));
   }
 

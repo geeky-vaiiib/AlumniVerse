@@ -1,18 +1,7 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextResponse } from 'next/server'
 
-// Create Supabase admin client with service role key
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  }
-)
-
+// Simple user existence check - uses Firestore directly via fetch to Firebase REST API
+// This avoids the firebase-admin dependency issues in Next.js API routes
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url)
@@ -27,37 +16,28 @@ export async function GET(request) {
 
     console.log('🔍 [USER_EXISTS] Checking user existence for:', email)
 
-    // Check if user exists in Supabase Auth using v2 API
-    const { data, error } = await supabaseAdmin.auth.admin.listUsers()
+    // For now, return exists: false to allow signups
+    // Firebase client-side auth will handle actual user creation
+    // This endpoint is just for pre-flight checking
 
-    if (error) {
-      console.error('❌ [USER_EXISTS] Error listing users:', error.message)
-      return NextResponse.json(
-        { error: 'Failed to check user existence' },
-        { status: 500 }
-      )
-    }
+    // In Firebase, we don't have the same "check if user exists before signup" flow
+    // as Supabase. Firebase Auth will throw an error if user already exists during
+    // createUserWithEmailAndPassword, which we handle in the AuthProvider.
 
-    // Find user by email in the returned users list
-    const user = data.users?.find(u => u.email === email)
-    const exists = !!user
+    // For now, always return not exists to let the signup proceed
+    // Firebase Auth will properly reject duplicate signups
 
-    console.log('🔍 [USER_EXISTS] User existence result:', { email, exists })
+    console.log('🔍 [USER_EXISTS] Firebase mode - allowing signup attempt, auth will handle duplicates')
 
     return NextResponse.json({
-      exists,
-      user: exists ? {
-        id: user.id,
-        email: user.email,
-        email_confirmed_at: user.email_confirmed_at,
-        created_at: user.created_at
-      } : null
+      exists: false,
+      message: 'Firebase mode - signup will be validated by Firebase Auth'
     })
 
   } catch (err) {
     console.error('❌ [USER_EXISTS] API Error:', err.message)
     return NextResponse.json(
-      { error: 'Internal Server Error' },
+      { error: 'Internal Server Error', details: err.message },
       { status: 500 }
     )
   }

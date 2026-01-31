@@ -6,7 +6,7 @@ import { Button } from "../ui/button"
 import { generateAvatar } from "../../lib/utils"
 import { useUser } from "../../contexts/UserContext"
 import { useAuth } from "../providers/AuthProvider"
-import { usePosts } from "../../hooks/useRealTime"
+// Removed usePosts
 
 export default function PostCreator({ onPost }) {
   const [content, setContent] = useState("")
@@ -15,7 +15,6 @@ export default function PostCreator({ onPost }) {
   const [isPosting, setIsPosting] = useState(false)
   const { getFullName } = useUser()
   const { session } = useAuth()
-  const { createPost } = usePosts()
 
   const currentUser = {
     name: getFullName(),
@@ -31,27 +30,27 @@ export default function PostCreator({ onPost }) {
     setIsPosting(true)
 
     try {
-      // Create post using the real-time hook
-      const newPost = await createPost({
+      // Structure the new post data
+      const newPostData = {
         content: content.trim(),
-        type: postType,
+        post_type: postType,
         images: [],
         links: [],
         tags: []
-      })
-
-      // Call parent onPost callback with the new post if provided
-      if (onPost && newPost) {
-        onPost(newPost)
       }
-      
+
+      // Delegate creation to parent (MainFeed handles Firestore)
+      if (onPost) {
+        await onPost(newPostData)
+      }
+
       // Reset form
       setContent("")
       setPostType("general")
       setIsExpanded(false)
     } catch (error) {
       console.error('Failed to create post:', error)
-      // The error is already handled in the usePosts hook
+      alert("Failed to post. Please try again.")
     } finally {
       setIsPosting(false)
     }
@@ -95,11 +94,10 @@ export default function PostCreator({ onPost }) {
                           key={type.id}
                           type="button"
                           onClick={() => setPostType(type.id)}
-                          className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
-                            postType === type.id
-                              ? "bg-primary text-primary-foreground border-primary"
-                              : "bg-transparent text-foreground-muted border-border hover:border-primary hover:text-primary"
-                          }`}
+                          className={`px-3 py-2 text-sm rounded-lg border transition-colors ${postType === type.id
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-transparent text-foreground-muted border-border hover:border-primary hover:text-primary"
+                            }`}
                         >
                           <span className="mr-1">{type.icon}</span>
                           {type.label}

@@ -1,6 +1,7 @@
 const { body, query, validationResult } = require('express-validator');
 const { supabase, supabaseAdmin, supabaseHelpers } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
+const logger = require('../utils/logger');
 
 /**
  * Jobs Controller
@@ -100,7 +101,7 @@ const getJobs = catchAsync(async (req, res, next) => {
     const { data: jobs, error, count } = await query;
 
     if (error) {
-      console.error('Supabase jobs query error:', error);
+      logger.error('Supabase jobs query error:', error);
       return next(new AppError('Failed to fetch jobs', 500));
     }
 
@@ -132,7 +133,7 @@ const getJobs = catchAsync(async (req, res, next) => {
     const { count: totalCount, error: countError } = await countQuery;
 
     if (countError) {
-      console.error('Count query error:', countError);
+      logger.error('Count query error:', countError);
     }
 
     // Calculate pagination metadata
@@ -175,7 +176,7 @@ const getJobs = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Jobs fetch error:', error);
+    logger.error('Jobs fetch error:', error);
     return next(new AppError('Failed to fetch jobs', 500));
   }
 });
@@ -213,7 +214,7 @@ const getJobById = catchAsync(async (req, res, next) => {
       if (error.code === 'PGRST116') {
         return next(new AppError('Job not found', 404));
       }
-      console.error('Supabase job fetch error:', error);
+      logger.error('Supabase job fetch error:', error);
       return next(new AppError('Failed to fetch job', 500));
     }
 
@@ -263,7 +264,7 @@ const getJobById = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Job fetch error:', error);
+    logger.error('Job fetch error:', error);
     return next(new AppError('Failed to fetch job', 500));
   }
 });
@@ -347,7 +348,7 @@ const createJob = catchAsync(async (req, res, next) => {
       .single();
 
     if (error) {
-      console.error('Supabase job creation error:', error);
+      logger.error('Supabase job creation error:', error);
       return next(new AppError('Failed to create job posting', 500));
     }
 
@@ -371,7 +372,7 @@ const createJob = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Job creation error:', error);
+    logger.error('Job creation error:', error);
     return next(new AppError('Failed to create job posting', 500));
   }
 });
@@ -417,7 +418,7 @@ const updateJob = catchAsync(async (req, res, next) => {
       if (fetchError.code === 'PGRST116') {
         return next(new AppError('Job not found', 404));
       }
-      console.error('Job fetch error:', fetchError);
+      logger.error('Job fetch error:', fetchError);
       return next(new AppError('Failed to fetch job', 500));
     }
 
@@ -474,7 +475,7 @@ const updateJob = catchAsync(async (req, res, next) => {
       .single();
 
     if (updateError) {
-      console.error('Job update error:', updateError);
+      logger.error('Job update error:', updateError);
       return next(new AppError('Failed to update job posting', 500));
     }
 
@@ -498,7 +499,7 @@ const updateJob = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Job update error:', error);
+    logger.error('Job update error:', error);
     return next(new AppError('Failed to update job posting', 500));
   }
 });
@@ -525,7 +526,7 @@ const deleteJob = catchAsync(async (req, res, next) => {
       if (fetchError.code === 'PGRST116') {
         return next(new AppError('Job not found', 404));
       }
-      console.error('Job fetch error:', fetchError);
+      logger.error('Job fetch error:', fetchError);
       return next(new AppError('Failed to fetch job', 500));
     }
 
@@ -541,7 +542,7 @@ const deleteJob = catchAsync(async (req, res, next) => {
       .eq('id', id);
 
     if (deleteError) {
-      console.error('Job deletion error:', deleteError);
+      logger.error('Job deletion error:', deleteError);
       return next(new AppError('Failed to delete job posting', 500));
     }
 
@@ -551,7 +552,7 @@ const deleteJob = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Job deletion error:', error);
+    logger.error('Job deletion error:', error);
     return next(new AppError('Failed to delete job posting', 500));
   }
 });
@@ -603,7 +604,7 @@ const getMyJobs = catchAsync(async (req, res, next) => {
     const { data: jobs, error } = await query;
 
     if (error) {
-      console.error('User jobs fetch error:', error);
+      logger.error('User jobs fetch error:', error);
       return next(new AppError('Failed to fetch your jobs', 500));
     }
 
@@ -622,7 +623,7 @@ const getMyJobs = catchAsync(async (req, res, next) => {
     const { count: totalCount, error: countError } = await countQuery;
 
     if (countError) {
-      console.error('Count query error:', countError);
+      logger.error('Count query error:', countError);
     }
 
     // Format jobs with additional info
@@ -659,7 +660,7 @@ const getMyJobs = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('User jobs fetch error:', error);
+    logger.error('User jobs fetch error:', error);
     return next(new AppError('Failed to fetch your jobs', 500));
   }
 });
@@ -688,7 +689,7 @@ const applyToJob = catchAsync(async (req, res, next) => {
       if (jobError.code === 'PGRST116') {
         return next(new AppError('Job not found or no longer active', 404));
       }
-      console.error('Job fetch error:', jobError);
+      logger.error('Job fetch error:', jobError);
       return next(new AppError('Failed to fetch job', 500));
     }
 
@@ -725,7 +726,7 @@ const applyToJob = catchAsync(async (req, res, next) => {
       .single();
 
     if (applicationError) {
-      console.error('Application creation error:', applicationError);
+      logger.error('Application creation error:', applicationError);
       return next(new AppError('Failed to submit application', 500));
     }
 
@@ -738,7 +739,7 @@ const applyToJob = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Job application error:', error);
+    logger.error('Job application error:', error);
     return next(new AppError('Failed to submit application', 500));
   }
 });
@@ -769,7 +770,7 @@ const getJobApplications = catchAsync(async (req, res, next) => {
       if (jobError.code === 'PGRST116') {
         return next(new AppError('Job not found', 404));
       }
-      console.error('Job fetch error:', jobError);
+      logger.error('Job fetch error:', jobError);
       return next(new AppError('Failed to fetch job', 500));
     }
 
@@ -814,7 +815,7 @@ const getJobApplications = catchAsync(async (req, res, next) => {
     const { data: applications, error } = await query;
 
     if (error) {
-      console.error('Applications fetch error:', error);
+      logger.error('Applications fetch error:', error);
       return next(new AppError('Failed to fetch applications', 500));
     }
 
@@ -831,7 +832,7 @@ const getJobApplications = catchAsync(async (req, res, next) => {
     const { count: totalCount, error: countError } = await countQuery;
 
     if (countError) {
-      console.error('Count query error:', countError);
+      logger.error('Count query error:', countError);
     }
 
     // Calculate pagination metadata
@@ -863,7 +864,7 @@ const getJobApplications = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Job applications fetch error:', error);
+    logger.error('Job applications fetch error:', error);
     return next(new AppError('Failed to fetch job applications', 500));
   }
 });
@@ -895,7 +896,7 @@ const updateApplicationStatus = catchAsync(async (req, res, next) => {
       if (jobError.code === 'PGRST116') {
         return next(new AppError('Job not found', 404));
       }
-      console.error('Job fetch error:', jobError);
+      logger.error('Job fetch error:', jobError);
       return next(new AppError('Failed to fetch job', 500));
     }
 
@@ -929,7 +930,7 @@ const updateApplicationStatus = catchAsync(async (req, res, next) => {
       if (updateError.code === 'PGRST116') {
         return next(new AppError('Application not found', 404));
       }
-      console.error('Application update error:', updateError);
+      logger.error('Application update error:', updateError);
       return next(new AppError('Failed to update application status', 500));
     }
 
@@ -942,7 +943,7 @@ const updateApplicationStatus = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Application status update error:', error);
+    logger.error('Application status update error:', error);
     return next(new AppError('Failed to update application status', 500));
   }
 });

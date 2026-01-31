@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const { body, query, validationResult } = require('express-validator');
 const { supabase, supabaseAdmin, supabaseHelpers } = require('../config/supabase');
 const { AppError, catchAsync } = require('../middlewares/errorMiddleware');
@@ -84,7 +85,7 @@ const getEvents = catchAsync(async (req, res, next) => {
     const { data: events, error } = await query;
 
     if (error) {
-      console.error('Supabase events query error:', error);
+      logger.error('Supabase events query error:', error);
       return next(new AppError('Failed to fetch events', 500));
     }
 
@@ -109,7 +110,7 @@ const getEvents = catchAsync(async (req, res, next) => {
     const { count: totalCount, error: countError } = await countQuery;
 
     if (countError) {
-      console.error('Count query error:', countError);
+      logger.error('Count query error:', countError);
     }
 
     // Format events with additional info
@@ -164,7 +165,7 @@ const getEvents = catchAsync(async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Events fetch error:', error);
+    logger.error('Events fetch error:', error);
     return next(new AppError('Failed to fetch events', 500));
   }
 });

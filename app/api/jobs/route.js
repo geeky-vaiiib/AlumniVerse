@@ -27,38 +27,46 @@ export async function GET() {
     }
 
     // Transform to expected format
-    const transformedJobs = (jobs || []).map(job => ({
-      id: job.id,
-      title: job.title,
-      company: job.company,
-      location: job.location,
-      type: job.type,
-      experience: job.experience_level || 'Entry Level',
-      description: job.description,
-      salary: job.salary_range || 'Not specified',
-      skills: job.required_skills || [],
-      postedBy: {
-        id: job.posted_by_user?.id,
-        name: `${job.posted_by_user?.first_name || ''} ${job.posted_by_user?.last_name || ''}`.trim() || 'Anonymous',
-        avatar: job.posted_by_user?.avatar_path,
-        batch: job.posted_by_user?.passing_year || 'Unknown',
-        position: job.posted_by_user?.current_position,
-        company: job.posted_by_user?.company
-      },
-      postedDate: job.created_at,
-      applicants: 0 // TODO: Add applicant count if needed
+    const transformedJobs = await Promise.all((jobs || []).map(async job => {
+      // Get applicant count for this job
+      const { count: applicantCount } = await supabase
+        .from('job_applications')
+        .select('*', { count: 'exact', head: true })
+        .eq('job_id', job.id)
+
+      return {
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        location: job.location,
+        type: job.type,
+        experience: job.experience_level || 'Entry Level',
+        description: job.description,
+        salary: job.salary_range || 'Not specified',
+        skills: job.required_skills || [],
+        postedBy: {
+          id: job.posted_by_user?.id,
+          name: `${job.posted_by_user?.first_name || ''} ${job.posted_by_user?.last_name || ''}`.trim() || 'Anonymous',
+          avatar: job.posted_by_user?.avatar_path,
+          batch: job.posted_by_user?.passing_year || 'Unknown',
+          position: job.posted_by_user?.current_position,
+          company: job.posted_by_user?.company
+        },
+        postedDate: job.created_at,
+        applicants: applicantCount || 0
+      }
     }))
 
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       data: { jobs: transformedJobs },
-      count: transformedJobs.length 
+      count: transformedJobs.length
     })
   } catch (error) {
     console.error('❌ [API] Jobs fetch error:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Internal server error' 
+    return NextResponse.json({
+      success: false,
+      error: 'Internal server error'
     }, { status: 500 })
   }
 }
@@ -67,11 +75,11 @@ export async function POST(request) {
   try {
     // Get the session from the request
     const { session } = await supabase.auth.getSession()
-    
+
     if (!session?.user) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'Authentication required' 
+      return NextResponse.json({
+        success: false,
+        error: 'Authentication required'
       }, { status: 401 })
     }
 
@@ -86,9 +94,9 @@ export async function POST(request) {
 
     if (userError || !userProfile) {
       console.error('❌ [API] User profile not found:', userError)
-      return NextResponse.json({ 
-        success: false, 
-        error: 'User profile not found' 
+      return NextResponse.json({
+        success: false,
+        error: 'User profile not found'
       }, { status: 400 })
     }
 
@@ -124,9 +132,9 @@ export async function POST(request) {
 
     if (error) {
       console.error('❌ [API] Error creating job:', error)
-      return NextResponse.json({ 
-        success: false, 
-        error: error.message 
+      return NextResponse.json({
+        success: false,
+        error: error.message
       }, { status: 400 })
     }
 
@@ -153,15 +161,15 @@ export async function POST(request) {
       applicants: 0
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      data: transformedJob 
+    return NextResponse.json({
+      success: true,
+      data: transformedJob
     })
   } catch (error) {
     console.error('❌ [API] Job creation error:', error)
-    return NextResponse.json({ 
-      success: false, 
-      error: 'Internal server error' 
+    return NextResponse.json({
+      success: false,
+      error: 'Internal server error'
     }, { status: 500 })
   }
 }

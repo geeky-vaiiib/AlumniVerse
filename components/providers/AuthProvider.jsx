@@ -1,12 +1,23 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabaseClient'
-import { initializeAuthHandler } from '@/lib/supabaseAuthHandler'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
+  updatePassword as firebaseUpdatePassword,
+  signOut as firebaseSignOut,
+  onAuthStateChanged
+} from 'firebase/auth'
+import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore'
+import { auth, db } from '@/lib/firebase'
 
 const AuthContext = createContext({})
 
-export const useAuth = () => {
+// Check if we're in development mode
+const IS_DEV = process.env.NODE_ENV === 'development'
+
+export function useAuth() {
   const context = useContext(AuthContext)
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider')
@@ -16,468 +27,361 @@ export const useAuth = () => {
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
-  const [session, setSession] = useState(null)
+  const [userProfile, setUserProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [isReady, setIsReady] = useState(false)
-  const [authReady, setAuthReady] = useState(false)
+  const [error, setError] = useState(null)
 
-  useEffect(() => {
-    let mounted = true
+  // Fetch or create user profile in Firestore
+  const fetchOrCreateProfile = useCallback(async (firebaseUser, additionalData = {}) => {
+    if (!firebaseUser) return null
 
-    console.log('🔐 [AUTH_PROVIDER] Initializing AuthProvider')
-    
-    // ✅ CRITICAL: Initialize global auth handler for OTP/magic link redirects
-    if (typeof window !== 'undefined') {
-      initializeAuthHandler()
-    }
-    
-    // Set ready immediately for auth operations
-    setIsReady(true)
-    setAuthReady(true)
-    setLoading(false)
+    try {
+      const userRef = doc(db, 'users', firebaseUser.uid)
+      const userDoc = await getDoc(userRef)
 
-    // Test Supabase connection (non-blocking)
-    const testConnection = async () => {
-      try {
-        const { error } = await supabase.from('users').select('*').limit(1)
-        if (error) {
-          console.warn('Supabase users table test failed (expected if auth_id column missing):', error.message)
-        } else {
-          console.log('✅ Supabase users table reachable')
+      if (userDoc.exists()) {
+        const profileData = { id: userDoc.id, ...userDoc.data() }
+        setUserProfile(profileData)
+        return profileData
+      } else {
+        // Create new profile
+        const newProfile = {
+          authId: firebaseUser.uid,
+          email: firebaseUser.email,
+          firstName: additionalData.firstName || additionalData.first_name || '',
+          lastName: additionalData.lastName || additionalData.last_name || '',
+          branch: additionalData.branch || '',
+          passingYear: additionalData.passingYear || additionalData.passing_year || null,
+          usn: additionalData.usn || '',
+          isEmailVerified: firebaseUser.emailVerified,
+          isProfileComplete: false,
+          isDeleted: false,
+          role: 'user',
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp()
         }
-      } catch (err) {
-        console.warn('Supabase connection test error (non-critical):', err.message)
+
+        await setDoc(userRef, newProfile)
+        const createdProfile = { id: firebaseUser.uid, ...newProfile }
+        setUserProfile(createdProfile)
+        return createdProfile
       }
-    }
+    } catch (err) {
+      console.warn('Firestore error (will use basic profile):', err.message)
 
-    // Fetch or create user profile
-    const fetchOrCreateProfile = async (userId, userEmail) => {
-      try {
-        console.log('Fetching profile for user:', userId)
-        
-        // Try to fetch existing profile
-        const { data, error, status } = await supabase
-          .from('users')
-          .select('*')
-          .eq('auth_id', userId)
-          .maybeSingle()
-
-        if (error && status === 406) {
-          console.warn('Profile not found (406), creating via server endpoint...')
-          
-          // Create profile via server endpoint
-          const response = await fetch('/api/profile/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              auth_id: userId, 
-              email: userEmail 
-            })
-          })
-
-          if (!response.ok) {
-            const text = await response.text()
-            console.error('Server profile creation failed:', text)
-            return null
-          }
-
-          const result = await response.json()
-          console.log('✅ Profile created via server endpoint')
-          return result.data
-        }
-
-        if (error) {
-          console.error('Profile fetch error:', error)
-          return null
-        }
-
-        if (data) {
-          console.log('✅ Profile found in database')
-          return data
-        }
-
-        // No profile found, create one
-        console.log('No profile found, creating...')
-        const response = await fetch('/api/profile/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            auth_id: userId, 
-            email: userEmail 
-          })
-        })
-
-        if (response.ok) {
-          const result = await response.json()
-          console.log('✅ Profile created successfully')
-          return result.data
-        } else {
-          const errorText = await response.text()
-          console.error('Profile creation failed:', errorText)
-          return null
-        }
-
-      } catch (err) {
-        console.error('Profile fetch/create error:', err)
-        return null
+      // If Firestore is offline, create a basic profile from auth data
+      // This allows the auth flow to continue
+      const basicProfile = {
+        id: firebaseUser.uid,
+        authId: firebaseUser.uid,
+        email: firebaseUser.email,
+        firstName: additionalData.firstName || additionalData.first_name || '',
+        lastName: additionalData.lastName || additionalData.last_name || '',
+        isEmailVerified: firebaseUser.emailVerified,
+        isProfileComplete: false,
+        _offlineMode: true // Flag to indicate this is a fallback profile
       }
-    }
-
-    // Get initial session with profile handling
-    const getInitialSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession()
-        
-        if (mounted) {
-          if (error) {
-            console.error('Error getting session:', error)
-            setSession(null)
-            setUser(null)
-          } else {
-            setSession(session)
-            setUser(session?.user ?? null)
-            
-            // If user is logged in, try to ensure profile exists (non-blocking)
-            if (session?.user?.id) {
-              fetchOrCreateProfile(session.user.id, session.user.email).catch(err => {
-                console.warn('Profile creation failed during initialization (non-critical):', err)
-              })
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Session initialization error:', error)
-        if (mounted) {
-          setSession(null)
-          setUser(null)
-        }
-      }
-    }
-
-    // Test connection first
-    testConnection()
-    
-    // Initialize session
-    getInitialSession()
-
-    // Listen for auth changes with profile handling - WITH DEBOUNCING
-    let sessionTimeout
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        if (!mounted) return
-        
-        console.log("[AUTH_PROVIDER][EVENT] 🔄", {
-          event,
-          hasSession: !!session,
-          userId: session?.user?.id,
-          userEmail: session?.user?.email,
-          timestamp: new Date().toISOString()
-        })
-        
-        // CRITICAL FIX: Don't clear session during transitions
-        if (!session && event !== 'SIGNED_OUT') {
-          console.log("[AUTH_PROVIDER] ⏸️ Preventing session clear during transition, event:", event)
-          return
-        }
-        
-        // DEBOUNCE: Clear any existing timeout and set a new one
-        clearTimeout(sessionTimeout)
-        sessionTimeout = setTimeout(async () => {
-          if (!mounted) return
-          
-          console.log("[DEBUG] Processing debounced auth state change:", event)
-          
-          setLoading(true)
-          setSession(session)
-          setUser(session?.user ?? null)
-          
-          // 🔐 CRITICAL: Sync session to server immediately after SIGNED_IN
-          if (event === 'SIGNED_IN' && session?.access_token) {
-            console.log('[AUTH_PROVIDER] 🔐 SIGNED_IN - syncing session to server...')
-            
-            // 🔧 FIX: Add small delay to ensure Supabase client fully sets localStorage first
-            await new Promise(resolve => setTimeout(resolve, 200))
-            
-            try {
-              const syncResponse = await fetch('/api/auth/session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  access_token: session.access_token,
-                  refresh_token: session.refresh_token
-                })
-              })
-              
-              if (syncResponse.ok) {
-                const syncData = await syncResponse.json()
-                console.log('[AUTH_PROVIDER] ✅ Session synced to server successfully:', syncData)
-                
-                // 🔧 CRITICAL: Wait a bit more to ensure cookies are set on server
-                await new Promise(resolve => setTimeout(resolve, 300))
-                console.log('[AUTH_PROVIDER] ✅ Server cookies should be fully set now')
-              } else {
-                const errorText = await syncResponse.text()
-                console.error('[AUTH_PROVIDER] ❌ Failed to sync session to server:', errorText)
-              }
-            } catch (syncError) {
-              console.error('[AUTH_PROVIDER] ❌ Session sync error:', syncError)
-            }
-            
-            // Handle profile creation for new sessions
-            console.log('[AUTH_PROVIDER] SIGNED_IN event - triggering profile fetch/create')
-            await fetchOrCreateProfile(session.user.id, session.user.email)
-          }
-          
-          setLoading(false)
-          setIsReady(true)
-          setAuthReady(true)
-          
-          console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthReady:", true, "Session:", !!session, "User:", !!session?.user)
-        }, 300) // 300ms debounce to let Supabase stabilize
-      }
-    )
-
-    return () => {
-      mounted = false
-      clearTimeout(sessionTimeout)
-      subscription?.unsubscribe()
+      setUserProfile(basicProfile)
+      return basicProfile
     }
   }, [])
 
-    // Sign up with OTP
+  // Listen for auth state changes
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true)
+
+      if (firebaseUser) {
+        setUser(firebaseUser)
+        await fetchOrCreateProfile(firebaseUser)
+      } else {
+        setUser(null)
+        setUserProfile(null)
+      }
+
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [fetchOrCreateProfile])
+
+  // Sign up with OTP (dev mode: uses local API)
   const signUpWithOTP = async (email, userData = {}) => {
+    setLoading(true)
+    setError(null)
+
     try {
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          data: userData,
-          shouldCreateUser: true,
-          // ✅ CRITICAL: Set redirectTo for OTP email link
-          emailRedirectTo: `${window.location.origin}/auth?redirectTo=/dashboard`
-        }
+      // Use dev OTP API
+      const response = await fetch('/api/auth/dev-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, userData })
       })
 
-      if (error) throw error
-      return { data, error: null }
-    } catch (error) {
-      console.error('Sign up error:', error)
-      return { data: null, error }
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP')
+      }
+
+      // Store email for verification
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('emailForSignIn', email)
+        window.localStorage.setItem('pendingUserData', JSON.stringify(userData))
+      }
+
+      console.log('🔐 OTP sent - check terminal for code')
+
+      return {
+        success: true,
+        message: 'OTP sent to terminal (dev mode)'
+      }
+    } catch (err) {
+      console.error('SignUp OTP error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
-  // Sign in with OTP
+  // Sign in with OTP (dev mode: uses local API)
   const signInWithOTP = async (email) => {
+    setLoading(true)
+    setError(null)
+
     try {
-      const { data, error } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false,
-          // ✅ CRITICAL: Set redirectTo for OTP email link
-          emailRedirectTo: `${window.location.origin}/auth?redirectTo=/dashboard`
-        }
+      // Use dev OTP API
+      const response = await fetch('/api/auth/dev-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
       })
 
-      if (error) throw error
-      return { data, error: null }
-    } catch (error) {
-      console.error('Sign in with OTP error:', error)
-      return { data: null, error }
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to send OTP')
+      }
+
+      // Store email for verification
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem('emailForSignIn', email)
+      }
+
+      console.log('🔐 OTP sent - check terminal for code')
+
+      return {
+        success: true,
+        message: 'OTP sent to terminal (dev mode)'
+      }
+    } catch (err) {
+      console.error('SignIn OTP error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
-  // Verify OTP with robust session handling and profile creation
-  const verifyOTP = async (email, token, userData = {}) => {
+  // Verify OTP (dev mode: validates against local API)
+  const verifyOTP = async (email, otp, userData = {}) => {
+    setLoading(true)
+    setError(null)
+
     try {
-      console.log('🔐 [TEMP] AuthProvider: Starting OTP verification', { email, hasUserData: !!userData })
-      
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'email'
-      })
+      // Verify OTP via dev API
+      const response = await fetch(`/api/auth/dev-otp?email=${encodeURIComponent(email)}&otp=${encodeURIComponent(otp)}`)
+      const data = await response.json()
 
-      if (error) {
-        console.error('🔐 [TEMP] AuthProvider: OTP verification failed', error)
-        throw error
+      if (!response.ok || !data.valid) {
+        throw new Error(data.error || 'Invalid OTP')
       }
 
-      const session = data?.session ?? null
-      const user = session?.user ?? null
+      console.log('✅ OTP verified successfully')
 
-      if (!user) {
-        throw new Error('No user returned after OTP verification')
+      // Get pending user data
+      const pendingData = typeof window !== 'undefined'
+        ? window.localStorage.getItem('pendingUserData')
+        : null
+      const additionalData = pendingData ? JSON.parse(pendingData) : userData
+
+      // Clean up storage
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem('emailForSignIn')
+        window.localStorage.removeItem('pendingUserData')
       }
 
-      console.log('🔐 [TEMP] AuthProvider: OTP verification successful', { 
-        userId: user.id, 
-        email: user.email,
-        hasSession: !!session 
-      })
-
-      // FIXED: Increased wait time for session to fully propagate to prevent race conditions
-      console.log('🔐 [TEMP] AuthProvider: Waiting for session propagation...')
-      await new Promise(resolve => setTimeout(resolve, 800))
-
-      // Get fresh session from client
-      const { data: sessionRes } = await supabase.auth.getSession()
-      const currentUser = sessionRes?.session?.user ?? user
-
-      console.log('🔐 [TEMP] AuthProvider: Fresh session retrieved', { 
-        currentUserId: currentUser.id,
-        hasSession: !!sessionRes?.session
-      })
-
-      // Check if profile exists
-      const { data: profile, error: profileErr } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', currentUser.id)
-        .single()
-
-      // If profile doesn't exist, create it via server endpoint
-      if (profileErr && (profileErr.code === 'PGRST116' || profileErr.status === 404)) {
-        console.log('Profile not found, creating via server endpoint...')
-        
-        try {
-          const response = await fetch('/api/profile/create', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session?.access_token}`
-            },
-            body: JSON.stringify({
-              auth_id: currentUser.id,
-              email: currentUser.email,
-              first_name: userData.first_name || userData.firstName || null,
-              last_name: userData.last_name || userData.lastName || null,
-              usn: userData.usn || null,
-              branch: userData.branch || null,
-              branch_code: userData.branch_code || null,
-              admission_year: userData.admission_year || userData.joining_year || null,
-              passing_year: userData.passing_year || null
-            })
-          })
-
-          if (response.ok) {
-            console.log('Profile created successfully via server endpoint')
-          } else if (response.status === 409) {
-            // Profile already exists - this is fine, not an error
-            console.log('Profile already exists (expected on re-verification)')
-          } else {
-            const errorData = await response.json()
-            console.warn('Server profile creation failed:', errorData)
-          }
-        } catch (serverError) {
-          console.warn('Server profile creation error:', serverError)
-          // Continue anyway - profile can be created later
-        }
-      } else if (profile) {
-        console.log('Profile found in database')
+      // Return success - the user should already be signed in via password
+      // This OTP is just for email verification
+      return {
+        success: true,
+        user: auth.currentUser,
+        userData: additionalData
       }
-
-      return { data, error: null }
-    } catch (error) {
-      console.error('OTP verification error:', error)
-      return { data: null, error }
+    } catch (err) {
+      console.error('Verify OTP error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
   // Sign up with password
   const signUpWithPassword = async (email, password, userData = {}) => {
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: userData
-        }
-      })
+    setLoading(true)
+    setError(null)
 
-      if (error) throw error
-      return { data, error: null }
-    } catch (error) {
-      console.error('Sign up with password error:', error)
-      return { data: null, error }
+    try {
+      const result = await createUserWithEmailAndPassword(auth, email, password)
+      await fetchOrCreateProfile(result.user, userData)
+
+      return {
+        success: true,
+        user: result.user
+      }
+    } catch (err) {
+      console.error('SignUp password error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
   // Sign in with password
   const signInWithPassword = async (email, password) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      })
+    setLoading(true)
+    setError(null)
 
-      if (error) {
-        // Don't log error for invalid credentials - it's expected for OTP-only users
-        if (error.code !== 'invalid_credentials') {
-          console.error('Sign in with password error:', error)
-        }
-        throw error
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password)
+      await fetchOrCreateProfile(result.user)
+
+      return {
+        success: true,
+        user: result.user
       }
-      return { data, error: null }
-    } catch (error) {
-      // Only log unexpected errors, not invalid credentials
-      if (error.code !== 'invalid_credentials') {
-        console.error('Password login error:', error)
+    } catch (err) {
+      console.error('SignIn password error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
       }
-      return { data: null, error }
+    } finally {
+      setLoading(false)
     }
   }
 
   // Reset password
   const resetPassword = async (email) => {
-    try {
-      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`
-      })
+    setLoading(true)
+    setError(null)
 
-      if (error) throw error
-      return { data, error: null }
-    } catch (error) {
-      console.error('Reset password error:', error)
-      return { data: null, error }
+    try {
+      await sendPasswordResetEmail(auth, email)
+      return {
+        success: true,
+        message: 'Password reset email sent'
+      }
+    } catch (err) {
+      console.error('Reset password error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
   // Update password
-  const updatePassword = async (password) => {
-    try {
-      const { data, error } = await supabase.auth.updateUser({
-        password
-      })
+  const updatePassword = async (newPassword) => {
+    setLoading(true)
+    setError(null)
 
-      if (error) throw error
-      return { data, error: null }
-    } catch (error) {
-      console.error('Update password error:', error)
-      return { data: null, error }
+    try {
+      if (!auth.currentUser) {
+        throw new Error('No user logged in')
+      }
+
+      await firebaseUpdatePassword(auth.currentUser, newPassword)
+      return {
+        success: true,
+        message: 'Password updated successfully'
+      }
+    } catch (err) {
+      console.error('Update password error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
   // Sign out
   const signOut = async () => {
+    setLoading(true)
+    setError(null)
+
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      
-      setSession(null)
+      await firebaseSignOut(auth)
       setUser(null)
-      return { error: null }
-    } catch (error) {
-      console.error('Sign out error:', error)
-      return { error }
+      setUserProfile(null)
+      return { success: true }
+    } catch (err) {
+      console.error('Sign out error:', err)
+      setError(err.message)
+      return {
+        success: false,
+        error: err.message
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Get ID token for API calls
+  const getIdToken = async () => {
+    if (!auth.currentUser) return null
+    try {
+      return await auth.currentUser.getIdToken()
+    } catch (err) {
+      console.error('Get ID token error:', err)
+      return null
+    }
+  }
+
+  // Refresh user profile
+  const refreshProfile = async () => {
+    if (user) {
+      await fetchOrCreateProfile(user)
     }
   }
 
   const value = {
     user,
-    session,
+    userProfile,
     loading,
-    isReady,
-    authReady,
-    isLoggedIn: !!session,
+    error,
     signUpWithOTP,
     signInWithOTP,
     verifyOTP,
@@ -485,7 +389,10 @@ export function AuthProvider({ children }) {
     signInWithPassword,
     resetPassword,
     updatePassword,
-    signOut
+    signOut,
+    getIdToken,
+    refreshProfile,
+    isAuthenticated: !!user,
   }
 
   return (

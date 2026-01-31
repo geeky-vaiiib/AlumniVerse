@@ -14,13 +14,20 @@ import { useToast } from "../../hooks/use-toast"
 
 export default function AuthFlow({ initialStep = 'login' }) {
   const router = useRouter()
-  const { session, loading, isLoggedIn, isReady, authReady } = useAuth()
+  // Firebase AuthProvider uses: user, userProfile, loading
+  const { user, userProfile: authProfile, loading } = useAuth()
   const { updateProfile, userProfile, loading: userLoading } = useUser()
   const [currentStep, setCurrentStep] = useState(initialStep)
   const [authData, setAuthData] = useState({})
   const { toast } = useToast()
   const [redirectTriggered, setRedirectTriggered] = useState(false)
-  
+
+  // Derived state for compatibility
+  const session = user ? { user } : null
+  const authReady = !loading
+  const isReady = !loading
+  const isLoggedIn = !!user
+
   // 🛡️ CRITICAL: One-time redirect guard to prevent infinite loops
   const hasRedirectedRef = useRef(false)
   const isMountedRef = useRef(true)
@@ -29,7 +36,7 @@ export default function AuthFlow({ initialStep = 'login' }) {
   useEffect(() => {
     console.log("[AUTH_FLOW] 🎬 Component mounted with initialStep:", initialStep)
     isMountedRef.current = true
-    
+
     // 🔧 Listen for route changes to dismiss toasts
     const handleRouteChange = () => {
       console.log("[AUTH_FLOW] 🎯 Route changed, dismissing toasts")
@@ -37,10 +44,10 @@ export default function AuthFlow({ initialStep = 'login' }) {
         toast.dismiss()
       }
     }
-    
+
     // Use router events if available (Next.js 13+ App Router doesn't have router.events)
     // Instead, we'll rely on unmount cleanup
-    
+
     return () => {
       console.log("[AUTH_FLOW] 🧹 Cleanup: component unmounted")
       isMountedRef.current = false
@@ -54,19 +61,19 @@ export default function AuthFlow({ initialStep = 'login' }) {
   // 🚨 EARLY REDIRECT: If on auth page with session and redirectTo, redirect immediately
   useEffect(() => {
     if (hasRedirectedRef.current) return
-    
+
     if (typeof window !== 'undefined' && window.location.pathname === '/auth') {
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirectTo')
-      
+
       if (redirectTo && session && authReady) {
         console.log("[AUTH_FLOW] 🚨 EARLY REDIRECT: Auth page with session and redirectTo detected")
         hasRedirectedRef.current = true
-        
+
         if (toast?.dismiss) {
           toast.dismiss()
         }
-        
+
         console.log("[AUTH_FLOW] 🎯 Early navigating to:", redirectTo)
         router.replace(redirectTo)
       }
@@ -78,7 +85,7 @@ export default function AuthFlow({ initialStep = 'login' }) {
       currentStep,
       authReady,
       hasSession: !!session,
-      sessionUserId: session?.user?.id,
+      sessionUserId: user?.uid,
       hasProfile: !!userProfile,
       profileComplete: userProfile?.is_complete,
       profileId: userProfile?.id,
@@ -91,11 +98,11 @@ export default function AuthFlow({ initialStep = 'login' }) {
     if (currentStep === 'otp-verification') {
       console.log("[AUTH_FLOW] 🔐 OTP verification step active")
     }
-    
+
     if (currentStep === 'profile') {
-      console.log("[AUTH_FLOW] 👤 Profile creation step active, user:", session?.user?.id)
+      console.log("[AUTH_FLOW] 👤 Profile creation step active, user:", user?.uid)
     }
-    
+
     if (currentStep === 'login-complete') {
       console.log("[AUTH_FLOW] ✅ Login completion step active")
     }
@@ -119,31 +126,31 @@ export default function AuthFlow({ initialStep = 'login' }) {
       hasRedirected: hasRedirectedRef.current,
       location: typeof window !== 'undefined' ? window.location.href : 'SSR'
     })
-    
+
     // ⛔ Wait until auth is ready
     if (!authReady) {
       console.log("[AUTH_FLOW] ⏳ Waiting for auth to stabilize...")
       return
     }
-    
+
     // 🚨 PRIORITY CHECK: If we have session and redirectTo param, redirect immediately
     // This handles the case where user is sent back to /auth?redirectTo=/dashboard
     if (authReady && session && typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirectTo')
-      
+
       if (redirectTo && window.location.pathname === '/auth') {
         console.log("[AUTH_FLOW] 🚨 Detected auth page with redirectTo and session - immediate redirect!")
         hasRedirectedRef.current = true
-        
+
         // Dismiss all toasts immediately
         if (toast?.dismiss) {
           console.log("[AUTH_FLOW] 🧹 Dismissing all toasts before redirect")
           toast.dismiss()
         }
-        
+
         console.log("[AUTH_FLOW] ⏳ Waiting 1 second for server session sync...")
-        
+
         // 🔧 CRITICAL FIX: Wait for server session to sync before redirect
         // This prevents middleware from not recognizing the session
         setTimeout(async () => {
@@ -152,7 +159,7 @@ export default function AuthFlow({ initialStep = 'login' }) {
             const serverCheck = await fetch('/api/auth/session')
             const serverData = await serverCheck.json()
             console.log("[AUTH_FLOW] 🔍 Server session check:", serverData)
-            
+
             if (serverData.hasSession) {
               console.log("[AUTH_FLOW] ✅ Server session confirmed, redirecting to:", redirectTo)
               router.replace(redirectTo)
@@ -171,36 +178,36 @@ export default function AuthFlow({ initialStep = 'login' }) {
         return
       }
     }
-    
+
     // ⛔ Wait for user profile to load (but not forever)
     if (userLoading && session) {
       console.log("[AUTH_FLOW] ⏳ Waiting for user profile to load...")
       return
     }
-    
+
     // ✅ Condition 1: User has completed profile - redirect to dashboard
-    if (authReady && session && (userProfile?.is_complete || userProfile?.profileCompleted)) {
+    if (authReady && user && (userProfile?.isProfileComplete || userProfile?.is_complete || userProfile?.profileCompleted)) {
       console.log("[AUTH_FLOW] ✅ Profile complete, initiating redirect")
       hasRedirectedRef.current = true
-      
+
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirectTo') || '/dashboard'
-      
+
       // Dismiss all toasts immediately
       if (toast?.dismiss) {
         console.log("[AUTH_FLOW] 🧹 Dismissing all toasts before redirect")
         toast.dismiss()
       }
-      
+
       console.log("[AUTH_FLOW] ⏳ Waiting for server session sync before redirect...")
-      
+
       // Wait for server session to sync
       setTimeout(async () => {
         try {
           const serverCheck = await fetch('/api/auth/session')
           const serverData = await serverCheck.json()
           console.log("[AUTH_FLOW] 🔍 Server session check:", serverData)
-          
+
           if (serverData.hasSession) {
             console.log("[AUTH_FLOW] ✅ Server session confirmed, redirecting to:", redirectTo)
             router.replace(redirectTo)
@@ -218,30 +225,30 @@ export default function AuthFlow({ initialStep = 'login' }) {
       }, 1000)
       return
     }
-    
+
     // ✅ Condition 2: On login-complete step with session - redirect
     if (currentStep === 'login-complete' && session && authReady) {
       console.log("[AUTH_FLOW] ✅ Login complete, initiating redirect")
       hasRedirectedRef.current = true
-      
+
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirectTo') || '/dashboard'
-      
+
       // Dismiss all toasts
       if (toast?.dismiss) {
         console.log("[AUTH_FLOW] 🧹 Dismissing all toasts before redirect")
         toast.dismiss()
       }
-      
+
       console.log("[AUTH_FLOW] ⏳ Waiting for server session sync before redirect...")
-      
+
       // Wait for server session to sync
       setTimeout(async () => {
         try {
           const serverCheck = await fetch('/api/auth/session')
           const serverData = await serverCheck.json()
           console.log("[AUTH_FLOW] 🔍 Server session check:", serverData)
-          
+
           if (serverData.hasSession) {
             console.log("[AUTH_FLOW] ✅ Server session confirmed, redirecting to:", redirectTo)
             router.replace(redirectTo)
@@ -264,7 +271,7 @@ export default function AuthFlow({ initialStep = 'login' }) {
   // Only log state changes, not every render
   const stateKey = `${loading}-${isLoggedIn}-${!!session}-${currentStep}-${isReady}`
   const [lastStateKey, setLastStateKey] = useState('')
-  
+
   if (stateKey !== lastStateKey) {
     console.log("[DEBUG][TIME]", new Date().toISOString(), "AuthFlow state changed:", {
       loading,
@@ -305,29 +312,29 @@ export default function AuthFlow({ initialStep = 'login' }) {
 
       // 🔒 Lock redirect immediately
       hasRedirectedRef.current = true
-      
+
       console.log('[AUTH_FLOW] 🚀 Redirecting after profile completion')
-      
+
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirectTo') || '/dashboard'
-      
+
       // Dismiss all existing toasts immediately
       if (toast?.dismiss) {
         console.log('[AUTH_FLOW] 🧹 Dismissing all toasts before redirect')
         toast.dismiss()
       }
-      
+
       console.log('[AUTH_FLOW] 🎯 Navigating to:', redirectTo)
-      
+
       // Small delay to ensure toast is dismissed
       setTimeout(() => {
         router.push(redirectTo)
       }, 100)
-      
+
     } catch (error) {
       console.error('[AUTH_FLOW] 💥 Error saving profile:', error)
       hasRedirectedRef.current = false // Reset on error
-      
+
       // Show error and stay on the profile page to allow retry
       toast({
         title: 'Failed to save profile',
